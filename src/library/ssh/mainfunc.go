@@ -60,7 +60,7 @@ func LocalExec(cmd string) sshexec.ExecResult {
 	}
 }
 
-func TransferByP2p(id string, hosts []string, user string, localFilePath string, remoteFilePath string, to int) ([]sshexec.ExecResult, error) {
+func TransferByP2p(id string, hosts []string, user string, localFilePath string, remoteFilePath string, to int, algorithm SSHAlgorithm) ([]sshexec.ExecResult, error) {
 	returnResult := make([]sshexec.ExecResult, len(hosts))
 	timeout := time.After(time.Duration(to) * time.Second)
 	//创建传输任务
@@ -94,7 +94,7 @@ func TransferByP2p(id string, hosts []string, user string, localFilePath string,
 				e.Host = ip
 				returnResult = append(returnResult, e)
 			}
-			err := TransP2pReName(id, hosts, user, localFilePath, remoteFilePath, 30)
+			err := TransP2pReName(id, hosts, user, localFilePath, remoteFilePath, 30, algorithm)
 			return returnResult, err
 		} else {
 			for ip, DispatchInfo := range res.DispatchInfos {
@@ -123,14 +123,15 @@ func TransferByP2p(id string, hosts []string, user string, localFilePath string,
 	}
 }
 
-func TransP2pReName(id string, hosts []string, user string, localFilePath string, remoteFilePath string, to int) error {
+func TransP2pReName(id string, hosts []string, user string, localFilePath string, remoteFilePath string, to int, algorithm SSHAlgorithm) error {
 	fileName := filepath.Base(localFilePath)
 	filePath := init_sever.P2pSvc.Cfg.DownDir
 	oldFile := filePath + fileName
 	cmd := fmt.Sprintf("mv -f %s %s", oldFile, remoteFilePath)
-	sshExecAgent := sshexec.SSHExecAgent{}
+	sshExecAgent := RemoteAgent{}
 	sshExecAgent.Worker = 10
 	sshExecAgent.TimeOut = 30 * time.Second
+	sshExecAgent.Algorithm = algorithm
 	port, _ := beego.AppConfig.Int("SshPort")
 	_, err := sshExecAgent.SshHostByKey(hosts, port, user, cmd)
 	return err

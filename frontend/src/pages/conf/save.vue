@@ -216,6 +216,12 @@ README.md"></el-input>
                 <el-radio :label="1">开启</el-radio>
               </el-radio-group>
             </el-form-item>
+            <el-form-item label="SSH算法">
+              <el-radio-group v-model="form.SshAlgorithm">
+                <el-radio :label="0">新算法</el-radio>
+                <el-radio :label="1">旧算法</el-radio>
+              </el-radio-group>
+            </el-form-item>
             <el-form-item label="是否启用gzip">
               <el-radio-group v-model="form.Gzip">
                 <el-radio :label="0">关闭</el-radio>
@@ -274,6 +280,7 @@ README.md"></el-input>
           RepoMode: "branch",
           Audit: 0,
           P2p: 0,
+          SshAlgorithm: 0,
           Gzip: 1,
           IsGroup: 0,
           HostGroup:"",
@@ -359,6 +366,9 @@ README.md"></el-input>
             data.HostGroupArray=[]
             if(data.HostGroup != ""){
               data.HostGroupArray=data.HostGroup.split(" ")
+            }
+            if(data.SshAlgorithm === undefined || data.SshAlgorithm === null){
+              data.SshAlgorithm = 0
             }
             this.form = data
 

@@ -45,6 +45,7 @@ type Project struct {
 	UpdatedAt           time.Time `orm:"column(updated_at);type(datetime);null"`
 	ShowHistory         int16     `orm:"column(view_history)"` //显示较前次上线的代码变更
 	P2p                 int16     `orm:"column(p2p)"`
+	SshAlgorithm        int16     `orm:"column(ssh_algorithm)"`
 	HostGroup           string    `orm:"column(host_group)"` //服务器分组，基于jumpserver groupid,groupid
 	Gzip                int16     `orm:"column(gzip)"`
 	IsGroup             int16     `orm:"column(is_group)"`

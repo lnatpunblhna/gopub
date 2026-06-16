@@ -66,9 +66,10 @@ func (c *BaseComponents) runRemoteCommand(command string, hosts []string) ([]ssh
 	id := c.SaveRecord(command)
 	start := time.Now()
 	createdAt := int(start.Unix())
-	sshExecAgent := sshexec.SSHExecAgent{}
+	sshExecAgent := gopubssh.RemoteAgent{}
 	sshExecAgent.Worker = SSHWorker
 	sshExecAgent.TimeOut = time.Duration(SSHREMOTETIMEOUT) * time.Second
+	sshExecAgent.Algorithm = gopubssh.SSHAlgorithm(c.project.SshAlgorithm)
 	port, _ := beego.AppConfig.Int("SshPort")
 	beego.Info(hosts)
 	beego.Info(port)
@@ -101,9 +102,10 @@ func (c *BaseComponents) copyFilesBySftp(src string, dest string, hosts []string
 	id := c.SaveRecord("Transfer")
 	start := time.Now()
 	createdAt := int(start.Unix())
-	sshExecAgent := sshexec.SSHExecAgent{}
+	sshExecAgent := gopubssh.RemoteAgent{}
 	sshExecAgent.Worker = SSHWorker
 	sshExecAgent.TimeOut = time.Duration(SSHREMOTETIMEOUT) * time.Second
+	sshExecAgent.Algorithm = gopubssh.SSHAlgorithm(c.project.SshAlgorithm)
 	port, _ := beego.AppConfig.Int("SshPort")
 	s, err := sshExecAgent.SftpHostByKey(hosts, port, c.project.ReleaseUser, src, dest)
 	ss, _ := json.Marshal(s)
@@ -132,7 +134,7 @@ func (c *BaseComponents) copyFilesByP2p(id string, src string, dest string, host
 			hosts = append(hosts, info.Ip)
 		}
 	}
-	s, err := gopubssh.TransferByP2p(id, hosts, c.project.ReleaseUser, src, dest, SSHREMOTETIMEOUT)
+	s, err := gopubssh.TransferByP2p(id, hosts, c.project.ReleaseUser, src, dest, SSHREMOTETIMEOUT, gopubssh.SSHAlgorithm(c.project.SshAlgorithm))
 	ss, _ := json.Marshal(s)
 	go c.LogTaskCommond(string(ss))
 	//获取执行时间

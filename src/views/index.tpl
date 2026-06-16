@@ -6,7 +6,7 @@
   <meta name="Keywords" content="自动发布系统">
   <meta name="Description" content="自动发布系统">
   <title>自动发布系统</title>
-  <script type="module" crossorigin src="/static/assets/index-ZIEmqC8z.js"></script>
+  <script type="module" crossorigin src="/static/assets/index-DZQmNgIt.js"></script>
   <link rel="modulepreload" crossorigin href="/static/assets/_plugin-vue_export-helper-BdZbcnYo.js">
   <link rel="modulepreload" crossorigin href="/static/assets/type-Dtqg0D4E.js">
   <link rel="stylesheet" crossorigin href="/static/assets/index-D5QEw7f8.css">
