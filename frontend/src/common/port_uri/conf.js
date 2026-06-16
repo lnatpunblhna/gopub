@@ -1,0 +1,13 @@
+const API_URL = import.meta.env.VITE_API_URL || ''
+
+export const list = API_URL + '/api/get/conf/list'
+export const mylist = API_URL + '/api/get/conf/mylist'
+export const get = API_URL + '/api/get/conf/get'
+export const del = API_URL + '/api/get/conf/del'
+export const save = API_URL + '/api/post/conf/save'
+export const detection = API_URL + '/api/get/walle/detection'
+export const copy = API_URL + '/api/get/conf/copy'
+export const tags = API_URL + '/api/get/conf/tags'
+export const lock = API_URL + '/api/get/conf/lock'
+export const server_groups = API_URL + '/api/get/conf/server_groups'
+export const groupinfo = API_URL + '/api/get/conf/groupinfo'

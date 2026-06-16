@@ -1,3 +1,6 @@
+//go:build agentserver
+// +build agentserver
+
 package main
 
 import (

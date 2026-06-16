@@ -1,10 +1,11 @@
 package confcontrollers
 
 import (
-	"github.com/linclin/gopub/src/controllers"
-
 	"encoding/json"
+	"time"
+
 	"github.com/astaxie/beego"
+	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/models"
 )
 
@@ -21,9 +22,31 @@ func (c *SaveController) Post() {
 		c.SetJson(1, nil, "数据格式错误")
 		return
 	}
+	now := time.Now()
 	if project.Id != 0 {
+		oldProject, err := models.GetProjectById(project.Id)
+		if err != nil {
+			c.SetJson(1, nil, "项目不存在")
+			return
+		}
+		project.UserId = oldProject.UserId
+		if project.UserId == 0 && c.User != nil && c.User.Id != 0 {
+			project.UserId = uint(c.User.Id)
+		}
+		project.CreatedAt = oldProject.CreatedAt
+		if project.CreatedAt.IsZero() {
+			project.CreatedAt = now
+		}
+		project.UpdatedAt = now
 		err = models.UpdateProjectById(&project)
 	} else {
+		if c.User == nil || c.User.Id == 0 {
+			c.SetJson(2, nil, "not login")
+			return
+		}
+		project.UserId = uint(c.User.Id)
+		project.CreatedAt = now
+		project.UpdatedAt = now
 		_, err = models.AddProject(&project)
 	}
 	if err != nil {

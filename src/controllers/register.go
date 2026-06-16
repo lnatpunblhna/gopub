@@ -16,7 +16,7 @@ type RegisterController struct {
 	BaseController
 }
 
-//邮箱正则
+// 邮箱正则
 func IsEmail(str ...string) bool {
 	var b bool
 	for _, s := range str {

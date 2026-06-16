@@ -1,0 +1,11 @@
+const API_URL = import.meta.env.VITE_API_URL || ''
+
+export const list = API_URL + '/api/get/task/list'
+export const get = API_URL + '/api/get/task/get'
+export const del = API_URL + '/api/get/task/del'
+export const save = API_URL + '/api/post/task/save'
+export const release = API_URL + '/api/get/walle/release'
+export const rollback = API_URL + '/api/get/task/rollback'
+export const flush = API_URL + '/api/get/walle/flush'
+export const chart = API_URL + '/api/get/task/chart'
+export const changes = API_URL + '/api/get/task/changes'

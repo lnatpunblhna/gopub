@@ -345,7 +345,7 @@ func (c *BaseComponents) getReleaseVersionPackage(version string) string {
 	return fmt.Sprintf("%s.tar.gz", c.getReleaseVersionDir(version))
 }
 
-//根据git地址获取项目名字
+// 根据git地址获取项目名字
 func (c *BaseComponents) GetGitProjectName(gitUrl string) string {
 	s := strings.Split(gitUrl, "/")
 	sname := s[len(s)-1]

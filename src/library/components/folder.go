@@ -34,10 +34,10 @@ func (c *BaseComponents) InitRemoteVersion(version string) error {
 	return err
 }
 
-/**
- * 将多个文件/目录传输到指定的多个目标机
-
- */
+/*
+*
+  - 将多个文件/目录传输到指定的多个目标机
+*/
 func (c *BaseComponents) CopyFiles() error {
 	err := c.packageFiles()
 	if err != nil {
@@ -65,10 +65,10 @@ func (c *BaseComponents) CopyFiles() error {
 	return nil
 }
 
-/**
- * 打软链
-
- */
+/*
+*
+  - 打软链
+*/
 func (c *BaseComponents) GetLinkCommand(version string) string {
 	user := c.project.ReleaseUser
 	project := c.GetGitProjectName(c.project.RepoUrl)

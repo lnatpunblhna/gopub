@@ -3,11 +3,12 @@ package models
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
 	_ "github.com/go-sql-driver/mysql"
-	"os"
-	"time"
 )
 
 var o orm.Ormer
@@ -39,7 +40,7 @@ func Syncdb() {
 
 }
 
-//数据库连接
+// 数据库连接
 func Connect() {
 	dbUser := beego.AppConfig.String("mysqluser")
 	dbPass := beego.AppConfig.String("mysqlpass")
@@ -67,7 +68,7 @@ func Connect() {
 	maxIdleConn, _ := beego.AppConfig.Int("mysql_max_idle_conn")
 	maxOpenConn, _ := beego.AppConfig.Int("mysql_max_open_conn")
 	dbLink := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", dbUser, dbPass, dbHost, dbPort, dbName) + "&loc=Asia%2FShanghai"
-	//utils.Display("dbLink", dbLink)
+	// utils.Display("dbLink", dbLink)
 	err := orm.RegisterDriver("mysql", orm.DRMySQL)
 	if err != nil {
 		beego.Error("数据库连接错误:", err)
@@ -83,7 +84,7 @@ func Connect() {
 	}
 }
 
-//创建数据库
+// 创建数据库
 func createdb() error {
 
 	dbUser := beego.AppConfig.String("mysqluser")
@@ -116,7 +117,7 @@ func createdb() error {
 	if err != nil {
 		beego.Error("数据库连接错误:", err)
 		os.Exit(2)
-		//panic(err.Error())
+		// panic(err.Error())
 		return err
 	}
 	sqlstring = fmt.Sprintf(" CREATE DATABASE if not exists `%s` CHARSET utf8 COLLATE utf8_general_ci", dbName)
@@ -143,7 +144,7 @@ func insertUser() {
 	u.AuthKey = "cJIrTa_b2Hnjn6BZkrL8PJkYto2Ael3O"
 	u.PasswordHash = "$2y$13$8q0MfKpnghuqCL.3FAAjiOkA8kBFNCW.ECUlqWp1zTpMHs9e5xn6u"
 	u.EmailConfirmationToken = "UpToOIawm1L8GjN6pLO4r-1oj20nLT5f_1443280741"
-	u.Email = "chuanzegao@163.com"
+	u.Email = "lnatpunblhna@gmail.com"
 	u.Avatar = "default.jpg"
 	u.Role = 1
 	u.Status = 10

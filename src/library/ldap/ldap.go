@@ -3,7 +3,7 @@ package ldap
 import (
 	"fmt"
 	"github.com/astaxie/beego"
-	ldap "gopkg.in/ldap.v3"
+	ldap "github.com/go-ldap/ldap/v3"
 	"strings"
 )
 

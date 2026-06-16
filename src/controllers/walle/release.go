@@ -73,7 +73,7 @@ func (c *ReleaseController) makeVersion() {
 	models.UpdateTaskById(c.Task)
 }
 
-//回滚任务
+// 回滚任务
 func (c *ReleaseController) rollBackHandling() error {
 	s := components.BaseComponents{}
 	s.SetProject(c.Project)
@@ -92,7 +92,7 @@ func (c *ReleaseController) rollBackHandling() error {
 	return nil
 }
 
-//普通上线任务
+// 普通上线任务
 func (c *ReleaseController) updateRecord(action int) error {
 	o := orm.NewOrm()
 	_, err := o.Raw("UPDATE `record` SET `action`= ?  WHERE`task_id` = ? and action=0", action, c.Task.Id).Exec()
@@ -102,7 +102,7 @@ func (c *ReleaseController) updateRecord(action int) error {
 	return nil
 }
 
-//普通上线任务
+// 普通上线任务
 func (c *ReleaseController) releaseHandling() error {
 	s := components.BaseComponents{}
 	s.SetProject(c.Project)
@@ -249,7 +249,7 @@ func (c *ReleaseController) enableRollBack() error {
 	}
 }
 
-//上线失败处理
+// 上线失败处理
 func (c *ReleaseController) failHandling(co *components.BaseComponents) {
 	//修改状态
 	c.Task.Status = 4

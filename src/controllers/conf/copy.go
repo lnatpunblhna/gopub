@@ -1,6 +1,8 @@
 package confcontrollers
 
 import (
+	"time"
+
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/models"
 )
@@ -21,6 +23,9 @@ func (c *CopyController) Get() {
 	c.Project.Name = c.Project.Name + " - copy"
 	c.Project.Id = 0
 	c.Project.UserId = uint(c.User.Id)
+	now := time.Now()
+	c.Project.CreatedAt = now
+	c.Project.UpdatedAt = now
 	_, err := models.AddProject(c.Project)
 	if err != nil {
 		c.SetJson(1, nil, "复制失败")

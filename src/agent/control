@@ -3,8 +3,7 @@ export GOROOT=/usr/local/go
 export PATH=$PATH:/usr/local/go/bin/ 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BASENAME=agent_main
-export GOPATH=$DIR
-export GOBIN=$DIR/bin/ 
+export GO111MODULE=on
 
 app=$BASENAME
 conf=src/agent.json

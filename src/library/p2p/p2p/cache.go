@@ -41,9 +41,9 @@ func (a byTime) Len() int           { return len(a) }
 func (a byTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byTime) Less(i, j int) bool { return a[i].atime.Before(a[j].atime) }
 
-//RAMCacheProvider provider creates a ram cache for each torrent.
-//Each time a cache is created or closed, all cache
-//are recalculated so they total <= capacity (in MiB).
+// RAMCacheProvider provider creates a ram cache for each torrent.
+// Each time a cache is created or closed, all cache
+// are recalculated so they total <= capacity (in MiB).
 type RAMCacheProvider struct {
 	capacity int
 	caches   map[string]*RAMCache
@@ -78,9 +78,9 @@ func (r *RAMCacheProvider) NewCache(infohash string, numPieces int, pieceSize in
 	return rc
 }
 
-//rebalance the cache capacity allocations; has to be called on each cache creation or deletion.
-//'shouldTrim', if true, causes trimCommitted() to be called on all the caches. Recommended if a new cache was created
-//because otherwise the old caches would stay over the new capacity until their next WriteAt happens.
+// rebalance the cache capacity allocations; has to be called on each cache creation or deletion.
+// 'shouldTrim', if true, causes trimCommitted() to be called on all the caches. Recommended if a new cache was created
+// because otherwise the old caches would stay over the new capacity until their next WriteAt happens.
 func (r *RAMCacheProvider) rebalance(shouldTrim bool) {
 	//Cache size is a diminishing return thing:
 	//The more of it a torrent has, the less of a difference additional cache makes.
@@ -118,17 +118,17 @@ func (r *RAMCacheProvider) cacheClosed(infohash string) {
 }
 
 // RAMCache ...
-//'pieceSize' is the size of the average piece
-//'capacity' is how many pieces the cache can hold
-//'actualUsage' is how many pieces the cache has at the moment
-//'atime' is an array of access times for each stored box
-//'store' is an array of "boxes" ([]byte of 1 piece each)
-//'isBoxFull' indicates if a box entirely contains written data
-//'isBoxCommit' indicates if a box has been committed to storage
-//'isByteSet' for [i] indicates for box 'i' if a byte has been written to
-//'torrentLength' is the number of bytes in the torrent
-//'cacheProvider' is a pointer to the cacheProvider that created this cache
-//'infohash' is the infohash of the torrent
+// 'pieceSize' is the size of the average piece
+// 'capacity' is how many pieces the cache can hold
+// 'actualUsage' is how many pieces the cache has at the moment
+// 'atime' is an array of access times for each stored box
+// 'store' is an array of "boxes" ([]byte of 1 piece each)
+// 'isBoxFull' indicates if a box entirely contains written data
+// 'isBoxCommit' indicates if a box has been committed to storage
+// 'isByteSet' for [i] indicates for box 'i' if a byte has been written to
+// 'torrentLength' is the number of bytes in the torrent
+// 'cacheProvider' is a pointer to the cacheProvider that created this cache
+// 'infohash' is the infohash of the torrent
 type RAMCache struct {
 	pieceSize     int
 	capacity      *uint32 //Access only through getter/setter
@@ -266,8 +266,8 @@ func (r *RAMCache) setCapacity(capacity int) {
 	atomic.StoreUint32(r.capacity, uint32(capacity))
 }
 
-//Trim stuff that's already been committed
-//Return true if we got underneath capacity, false if not.
+// Trim stuff that's already been committed
+// Return true if we got underneath capacity, false if not.
 func (r *RAMCache) trimCommitted() bool {
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -282,7 +282,7 @@ func (r *RAMCache) trimCommitted() bool {
 	return false
 }
 
-//Trim excess data. Returns any uncommitted chunks that were trimmed
+// Trim excess data. Returns any uncommitted chunks that were trimmed
 func (r *RAMCache) trim() []chunk {
 	if r.trimCommitted() {
 		return nil

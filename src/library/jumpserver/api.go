@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-// type gid2hostinfo struct {
-// 	gid ip2hostname
-// }
+//	type gid2hostinfo struct {
+//		gid ip2hostname
+//	}
 type authinfo struct {
 	Token string
 	//	User interface{}

@@ -1,0 +1,36 @@
+{
+  "name": "frontend",
+  "version": "2.0.0",
+  "description": "gopub frontend console",
+  "author": "gaoshan <lnatpunblhna@gmail.com>",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "^6.0.2",
+    "axios": "^1.13.2",
+    "echarts": "^6.0.0",
+    "element-plus": "^2.12.0",
+    "font-awesome": "^4.7.0",
+    "js-base64": "^3.7.8",
+    "normalize.css": "^8.0.1",
+    "nprogress": "^0.2.0",
+    "sass": "^1.97.0",
+    "vite": "^8.0.16",
+    "vue": "^3.5.25",
+    "vue-router": "^4.6.3",
+    "vuex": "^4.1.0"
+  },
+  "engines": {
+    "node": ">= 20.19.0",
+    "npm": ">= 10.0.0"
+  },
+  "browserslist": [
+    "defaults",
+    "not IE 11"
+  ]
+}

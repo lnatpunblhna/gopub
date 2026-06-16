@@ -13,7 +13,7 @@ type NoAutoController struct {
 	controllers.BaseController
 }
 
-//这里是查询每天 每周 每月 未进入预发布的项目
+// 这里是查询每天 每周 每月 未进入预发布的项目
 func (c *NoAutoController) Get() {
 	taskType := c.GetString("taskType")
 	beego.Info(taskType)

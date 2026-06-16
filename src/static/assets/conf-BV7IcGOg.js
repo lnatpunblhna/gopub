@@ -1,0 +1,1 @@
+var e=`/api/get/conf/list`,t=`/api/get/conf/mylist`,n=`/api/get/conf/get`,r=`/api/get/conf/del`,i=`/api/post/conf/save`,a=`/api/get/walle/detection`,o=`/api/get/conf/copy`,s=`/api/get/conf/tags`,c=`/api/get/conf/lock`,l=`/api/get/conf/server_groups`,u=`/api/get/conf/groupinfo`;export{u as a,t as c,s as d,n as i,i as l,r as n,e as o,a as r,c as s,o as t,l as u};
