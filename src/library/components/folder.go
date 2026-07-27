@@ -290,8 +290,16 @@ func (c *BaseComponents) GetGitLog() error {
 	return err
 }
 func (c *BaseComponents) GetGitPull() error {
+	// 用 fetch + reset 代替 git pull,避开 tracking 配置(分支名与远程不匹配会导致 pull 失败)
+	branch := ""
+	if c.task != nil {
+		branch = c.task.Branch
+	}
+	if branch == "" {
+		branch = "$(git remote show origin | sed -n 's/.*HEAD branch: //p')"
+	}
 	cmds1 := []string{}
-	cmds1 = append(cmds1, fmt.Sprintf("cd %s && git pull && rm Runtime/* -rf", c.project.ReleaseTo))
+	cmds1 = append(cmds1, fmt.Sprintf("cd %s && git fetch --all -q && BR=%s && git reset --hard \"origin/$BR\" && rm -rf Runtime/*", c.project.ReleaseTo, branch))
 	cmd1 := strings.Join(cmds1, "&&")
 	_, err := c.runRemoteCommand(cmd1, []string{})
 	return err

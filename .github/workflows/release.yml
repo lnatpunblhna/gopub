@@ -1,0 +1,64 @@
+name: Release
+
+# 打形如 v1.2.3 的 tag 时自动打包并发布 Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+# 创建 Release / 上传附件需要写权限
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # 前端构建,产物落到 src/views、src/static(与 Dockerfile 一致)
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # 后端构建,产物为 src/gopub(等价于 control build)
+      - name: Build backend
+        working-directory: src
+        run: go build -trimpath -ldflags "-s -w" -o gopub .
+
+      # 打包,制品清单与 control pack 保持一致,顶层目录名为 gopub
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          rm -rf src/logs/*
+          mkdir -p src/logs
+          STAGE="$(mktemp -d)/gopub"
+          mkdir -p "$STAGE/src/logs"
+          cp control "$STAGE/"
+          cp src/gopub "$STAGE/src/"
+          cp src/favicon.ico "$STAGE/src/"
+          cp -r src/conf src/agent src/views src/static "$STAGE/src/"
+          tar -C "$(dirname "$STAGE")" -zcvf "gopub-${VERSION}.tar.gz" gopub
+          echo "ARTIFACT=gopub-${VERSION}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARTIFACT }}
+          generate_release_notes: true

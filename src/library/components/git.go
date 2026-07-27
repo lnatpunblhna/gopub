@@ -18,8 +18,10 @@ func (c *BaseGit) UpdateRepo(branch string, gitDir string) error {
 	if gitDir == "" {
 		gitDir = c.baseComponents.GetDeployFromDir()
 	}
-	if branch == "" {
-		branch = "master"
+	// 分支为空时自动探测远程默认分支(master / main 自适应),不再写死 master
+	branchExpr := branch
+	if branchExpr == "" {
+		branchExpr = "$(git remote show origin | sed -n 's/.*HEAD branch: //p')"
 	}
 	dotGit := strings.TrimRight(gitDir, "/") + "/.git"
 	if _, err := os.Stat(dotGit); err != nil {
@@ -28,19 +30,20 @@ func (c *BaseGit) UpdateRepo(branch string, gitDir string) error {
 			cmds = append(cmds, fmt.Sprintf("mkdir -p %s ", gitDir))
 			cmds = append(cmds, fmt.Sprintf("cd %s ", gitDir))
 			cmds = append(cmds, fmt.Sprintf("/usr/bin/env git clone -q %s .", c.baseComponents.project.RepoUrl))
-			cmds = append(cmds, fmt.Sprintf("/usr/bin/env git checkout -q %s", branch))
+			cmds = append(cmds, fmt.Sprintf("BR=%s ", branchExpr))
+			cmds = append(cmds, `/usr/bin/env git checkout -q "$BR"`)
 			cmd := strings.Join(cmds, " && ")
 			_, err := c.baseComponents.runLocalCommand(cmd)
 			return err
 		}
 	}
+	// 用 fetch + reset 强制对齐远程分支,避开 pull 的 merge/tracking 配置
 	cmds := []string{}
 	cmds = append(cmds, fmt.Sprintf("cd %s ", gitDir))
-	cmds = append(cmds, fmt.Sprintf("/usr/bin/env git fetch --all"))
-	cmds = append(cmds, fmt.Sprintf("/usr/bin/env git reset --hard origin/master "))
-	cmds = append(cmds, fmt.Sprintf("/usr/bin/env git checkout -q %s ", branch))
-	cmds = append(cmds, fmt.Sprintf("/usr/bin/env git fetch -q --all"))
-	cmds = append(cmds, fmt.Sprintf("/usr/bin/env git reset -q --hard origin/%s ", branch))
+	cmds = append(cmds, "/usr/bin/env git fetch -q --all")
+	cmds = append(cmds, fmt.Sprintf("BR=%s ", branchExpr))
+	cmds = append(cmds, `/usr/bin/env git checkout -q "$BR"`)
+	cmds = append(cmds, `/usr/bin/env git reset -q --hard "origin/$BR"`)
 	cmd := strings.Join(cmds, " && ")
 	_, err := c.baseComponents.runLocalCommand(cmd)
 	return err
@@ -67,10 +70,10 @@ func (c *BaseGit) UpdateToVersion() error {
 func (c *BaseGit) GetBranchList() ([]map[string]string, error) {
 	history := []map[string]string{}
 	destination := c.baseComponents.GetDeployFromDir()
-	c.UpdateRepo("master", destination)
+	c.UpdateRepo("", destination)
 	cmds := []string{}
 	cmds = append(cmds, fmt.Sprintf("cd %s ", destination))
-	cmds = append(cmds, "/usr/bin/env git pull -a ")
+	cmds = append(cmds, "/usr/bin/env git fetch -q --all ")
 	cmds = append(cmds, "/usr/bin/env git branch -a ")
 	cmd := strings.Join(cmds, " && ")
 	s, err := c.baseComponents.runLocalCommand(cmd)
@@ -99,9 +102,7 @@ func (c *BaseGit) GetCommitList(branch string, count int) ([]map[string]string, 
 		count = 20
 
 	}
-	if branch == "" {
-		branch = "master"
-	}
+	// branch 为空时交给 UpdateRepo 探测远程默认分支,不再写死 master
 	history := []map[string]string{}
 	destination := c.baseComponents.GetDeployFromDir()
 	c.UpdateRepo(branch, destination)
