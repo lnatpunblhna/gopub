@@ -934,6 +934,7 @@
     width: 100%;
     height: auto;
     bottom: auto;
+    overflow: visible;
     box-shadow: none;
     .logo {
       height: 64px;
@@ -949,11 +950,16 @@
         min-width: 148px;
       }
       .menu-group {
+        position: relative;
         flex: 0 0 auto;
       }
-      .el-menu {
+      .el-submenu .el-menu,
+      .el-sub-menu .el-menu {
         position: absolute;
+        top: 100%;
+        left: 0;
         min-width: 180px;
+        margin-top: 4px;
         padding: 8px;
         background: var(--gp-sidebar);
         border-radius: var(--gp-radius);

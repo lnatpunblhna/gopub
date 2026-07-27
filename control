@@ -8,7 +8,7 @@ export GO111MODULE=on
 app=$BASENAME
 conf=$DIR/src/conf/app.conf
 pidfile=$DIR/$BASENAME.pid
-logfile=$DIR/$BASENAME.log
+logfile=$DIR/src/logs/stdout.log
 
  function check_pid() {
     if [ -f $pidfile ];then
@@ -33,7 +33,7 @@ function pack() {
     build
     cd  ..
     rm  -rf $BASENAME/src/logs/*
-    cd  .. && tar zcvf $app.tar.gz $BASENAME/control $BASENAME/src/$app  $BASENAME/src/conf    $BASENAME/src/logs   $BASENAME/src/agent  $BASENAME/src/views $BASENAME/src/static  $BASENAME/src/favicon.ico
+    cd  .. && tar zcvf $app.tar.gz $BASENAME/control $BASENAME/$app.service $BASENAME/src/$app  $BASENAME/src/conf    $BASENAME/src/logs   $BASENAME/src/agent  $BASENAME/src/views $BASENAME/src/static  $BASENAME/src/favicon.ico
 }
 function start() {
     check_pid
@@ -47,7 +47,8 @@ function start() {
     if ! [ -f $conf ];then
         echo "Config file $conf doesn't exist, creating one." 
     fi
-    cd $DIR/src/ 
+    cd $DIR/src/
+    mkdir -p $DIR/src/logs
     nohup  ./$BASENAME  >$logfile 2>&1 &
     sleep 1
     running=`ps -p $! | grep -v "PID TTY" | wc -l`

@@ -6,8 +6,6 @@
           <router-link style="float: left; margin-right: 10px" :to="{name: 'register'}" tag="span">
             <el-button type="primary" icon="plus" size="small">添加</el-button>
           </router-link>
-          <el-button type="warning" size="small" @click="sync_ldap()">从ldap同步</el-button>
-          <el-button type="warning" size="small" @click="test_ldap()">测试ldap</el-button>
         </panel-title>
 
         <div class="panel-body">
@@ -151,6 +149,34 @@
                     this.load_data = false
             })
             .
+                catch(() => {
+                    this.load_data = false
+            })
+            },
+            //根据id删除用户
+            delete_data(id){
+                this.$confirm('此操作将删除该用户, 是否继续?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+                    this.load_data = true
+                this.$http.get(port_user.del, {
+                            params: {
+                                id: id,
+                            }
+                        })
+                        .then(({data: {msg}}) => {
+                    this.get_table_data()
+                this.$message({
+                    message: msg,
+                    type: 'success'
+                })
+            }).
+                catch(() => {
+                    this.load_data = false
+            })
+            }).
                 catch(() => {
                     this.load_data = false
             })

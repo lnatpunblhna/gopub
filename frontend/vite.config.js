@@ -3,8 +3,12 @@ import { copyFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: '/static/',
+  // 生产构建剥离 console/debugger,开发环境保留
+  esbuild: {
+    drop: command === 'build' ? ['console', 'debugger'] : []
+  },
   plugins: [
     vue(),
     {
@@ -47,4 +51,4 @@ export default defineConfig({
       '/api': 'http://127.0.0.1:8192'
     }
   }
-})
+}))

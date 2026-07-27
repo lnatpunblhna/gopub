@@ -51,6 +51,7 @@ jobs:
           STAGE="$(mktemp -d)/gopub"
           mkdir -p "$STAGE/src/logs"
           cp control "$STAGE/"
+          cp gopub.service "$STAGE/"
           cp src/gopub "$STAGE/src/"
           cp src/favicon.ico "$STAGE/src/"
           cp -r src/conf src/agent src/views src/static "$STAGE/src/"

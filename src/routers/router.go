@@ -76,6 +76,7 @@ func init() {
 	beego.Router("/api/get/other/noauto", &othercontrollers.NoAutoController{})
 	beego.Router("/api/get/test/api", &controllers.TestApiController{})
 	beego.Router("/api/get/user/project", &usercontrollers.UserProjectController{})
+	beego.Router("/api/get/user/del", &usercontrollers.DelController{})
 	beego.Router("/api/get/user", &usercontrollers.UserController{})
 	beego.Router("/", &controllers.MainController{})
 	ns := beego.NewNamespace("/v1",

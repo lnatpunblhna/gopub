@@ -83,7 +83,11 @@
                         width="360">
                 <template #default="props">
 
-                <el-popover ref="popover4" placement="left-start" width="620" trigger="click" >
+                <div class="table-actions">
+                <el-popover placement="left-start" :width="620" trigger="click" @show="open(props.row.id)">
+                <template #reference>
+                    <el-button type="info" size="small" icon="search">查看</el-button>
+                </template>
                  <div style="margin-left:10px;font-size:15px">
               <i class="el-icon-date" style="color:#20A0FF"></i>  <span style="margin-left:8px;color:#20A0FF">项目详情</span>
                 </div>
@@ -186,8 +190,6 @@
 
 
                 </el-popover>
-                        <div class="table-actions">
-                            <el-button type="info" v-popover:popover4 size="small" icon="search" @click="open(props.row.id)">查看</el-button>
                             <router-link :to="{name: 'confDetection', params: {id: props.row.id}}" tag="span">
                                 <el-button type="success" size="small" icon="setting">检测</el-button>
                             </router-link>
@@ -207,7 +209,7 @@
                     <el-pagination
                             @current-change="handleCurrentChange"
                             :current-page="currentPage"
-                            :page-size="10"
+                            :page-size="length"
                             layout="total, prev, pager, next"
                             :total="total">
                     </el-pagination>

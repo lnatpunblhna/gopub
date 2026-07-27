@@ -72,14 +72,15 @@ func init() {
 	if beego.BConfig.RunMode == "dev" {
 		orm.Debug = true
 	}
-	//设置日志
+	//设置日志:按天分割,保留30天,自动轮转
 	fn := "logs/run.log"
+	os.MkdirAll("logs", 0755)
 	if _, err := os.Stat(fn); err != nil {
 		if os.IsNotExist(err) {
 			os.Create(fn)
 		}
 	}
-	beego.SetLogger("file", `{"filename":"`+fn+`"}`)
+	beego.SetLogger("file", `{"filename":"`+fn+`","daily":true,"maxdays":30,"rotate":true,"perm":"0644"}`)
 	if beego.BConfig.RunMode == "prod" {
 		beego.SetLevel(beego.LevelInformational)
 	}

@@ -158,7 +158,9 @@
         this.create_charts(tab.name, queryMap[tab.name])
       },
       getChart(ref) {
-        const dom = this.$refs[ref]
+        // ref 声明在 v-for 内时 this.$refs[ref] 是数组,需取出真正的 DOM 元素
+        const raw = this.$refs[ref]
+        const dom = Array.isArray(raw) ? raw[0] : raw
         if (!dom || !this.echartsInstance) return null
         if (!this.chartInstances[ref]) {
           this.chartInstances[ref] = this.echartsInstance.init(dom)
