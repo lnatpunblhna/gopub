@@ -4,34 +4,30 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/astaxie/beego"
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
+	"github.com/linclin/gopub/src/library/logger"
 	"github.com/linclin/gopub/src/models"
 )
 
-type SaveController struct {
-	controllers.BaseController
-}
-
-func (c *SaveController) Post() {
-	//projectId,_:=c.GetInt("projectId",0)
-	beego.Info(string(c.Ctx.Input.RequestBody))
+func Save(c echo.Context) error {
+	ctx := controllers.New(c)
+	//projectId,_:=ctx.GetInt("projectId",0)
+	logger.Info(string(ctx.RequestBody()))
 	var project models.Project
-	err := json.Unmarshal(c.Ctx.Input.RequestBody, &project)
+	err := json.Unmarshal(ctx.RequestBody(), &project)
 	if err != nil {
-		c.SetJson(1, nil, "数据格式错误")
-		return
+		return ctx.SetJson(1, nil, "数据格式错误")
 	}
 	now := time.Now()
 	if project.Id != 0 {
 		oldProject, err := models.GetProjectById(project.Id)
 		if err != nil {
-			c.SetJson(1, nil, "项目不存在")
-			return
+			return ctx.SetJson(1, nil, "项目不存在")
 		}
 		project.UserId = oldProject.UserId
-		if project.UserId == 0 && c.User != nil && c.User.Id != 0 {
-			project.UserId = uint(c.User.Id)
+		if project.UserId == 0 && ctx.User != nil && ctx.User.Id != 0 {
+			project.UserId = uint(ctx.User.Id)
 		}
 		project.CreatedAt = oldProject.CreatedAt
 		if project.CreatedAt.IsZero() {
@@ -39,20 +35,19 @@ func (c *SaveController) Post() {
 		}
 		project.UpdatedAt = now
 		err = models.UpdateProjectById(&project)
-	} else {
-		if c.User == nil || c.User.Id == 0 {
-			c.SetJson(2, nil, "not login")
-			return
+		if err != nil {
+			return ctx.SetJson(1, nil, "数据库更新错误")
 		}
-		project.UserId = uint(c.User.Id)
+	} else {
+		if ctx.User == nil || ctx.User.Id == 0 {
+			return ctx.SetJson(2, nil, "not login")
+		}
+		project.UserId = uint(ctx.User.Id)
 		project.CreatedAt = now
 		project.UpdatedAt = now
-		_, err = models.AddProject(&project)
+		if _, err = models.AddProject(&project); err != nil {
+			return ctx.SetJson(1, nil, "数据库更新错误")
+		}
 	}
-	if err != nil {
-		c.SetJson(1, nil, "数据库更新错误")
-		return
-	}
-	c.SetJson(0, project, "修改成功")
-	return
+	return ctx.SetJson(0, project, "修改成功")
 }

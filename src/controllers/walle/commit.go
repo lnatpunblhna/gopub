@@ -1,33 +1,26 @@
 package wallecontrollers
 
 import (
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/components"
 	"github.com/linclin/gopub/src/models"
 )
 
-type CommitController struct {
-	controllers.BaseController
-}
-
-func (c *CommitController) Get() {
-	if c.Project == nil || c.Project.Id == 0 {
-		c.SetJson(1, nil, "Parameter error")
-		return
+func Commit(c echo.Context) error {
+	ctx := controllers.New(c)
+	if ctx.Project == nil || ctx.Project.Id == 0 {
+		return ctx.SetJson(1, nil, "Parameter error")
 	}
-	branch := c.GetString("branch")
+	branch := ctx.GetString("branch")
 	s := components.BaseComponents{}
-	s.SetProject(c.Project)
+	s.SetProject(ctx.Project)
 	s.SetTask(&models.Task{})
 	g := components.BaseGit{}
 	g.SetBaseComponents(s)
 	res, err := g.GetCommitList(branch, 25)
 	if err != nil {
-		c.SetJson(1, nil, "获取Commit错误—"+err.Error())
-		return
-	} else {
-		c.SetJson(0, res, "")
-		return
+		return ctx.SetJson(1, nil, "获取Commit错误—"+err.Error())
 	}
-
+	return ctx.SetJson(0, res, "")
 }

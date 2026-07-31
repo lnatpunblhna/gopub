@@ -1,19 +1,18 @@
 package wallecontrollers
 
 import (
+	"strings"
+
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/common"
 	"github.com/linclin/gopub/src/library/components"
 	"github.com/linclin/gopub/src/models"
-	"strings"
 )
 
-type FlushController struct {
-	controllers.BaseController
-}
-
-func (c *FlushController) Get() {
-	projectIds := c.GetString("projectIds")
+func Flush(c echo.Context) error {
+	ctx := controllers.New(c)
+	projectIds := ctx.GetString("projectIds")
 	projectIdsArr := strings.Split(projectIds, ",")
 	res := []map[string]interface{}{}
 	for _, projectId := range projectIdsArr {
@@ -31,7 +30,5 @@ func (c *FlushController) Get() {
 			res = append(res, map[string]interface{}{"name": Project.Name, "msg": "success"})
 		}
 	}
-	c.SetJson(0, res, "")
-	return
-
+	return ctx.SetJson(0, res, "")
 }

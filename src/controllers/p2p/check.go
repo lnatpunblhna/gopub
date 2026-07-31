@@ -1,19 +1,15 @@
 package p2pcontrollers
 
 import (
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/common"
 	"github.com/linclin/gopub/src/library/components"
+	"github.com/linclin/gopub/src/library/db"
+	"github.com/linclin/gopub/src/library/logger"
 	"github.com/linclin/gopub/src/library/p2p/init_sever"
 	"github.com/linclin/gopub/src/models"
-
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
 )
-
-type CheckController struct {
-	controllers.BaseController
-}
 
 type P2pinfo struct {
 	Host   string
@@ -22,67 +18,62 @@ type P2pinfo struct {
 	Pname  string
 }
 
-func (c *CheckController) Get() {
-	searchtype := c.GetString("type")
-	projectId := c.GetString("projectId")
-	beego.Info(searchtype)
+func Check(c echo.Context) error {
+	ctx := controllers.New(c)
+	searchtype := ctx.GetString("type")
+	projectId := ctx.GetString("projectId")
+	logger.Info(searchtype)
+
 	if searchtype == "0" {
-		o := orm.NewOrm()
 		var projects []models.Project
 		var p []P2pinfo
 		ss := map[string]string{}
-		i, err := o.Raw("SELECT * FROM `project` WHERE `p2p` = 1 ").QueryRows(&projects)
-		if i > 0 && err == nil {
-			for _, project := range projects {
-				s := components.BaseComponents{}
-				s.SetProject(&project)
-				ips := s.GetHostIps()
-				proRes := init_sever.P2pSvc.CheckAllClient(ips)
-				for key, value := range proRes {
-					if value == "dead" {
-						pa := P2pinfo{}
-						if !common.InList(key, ss) {
-							ss[key] = value
-							pa.Host = key
-							pa.Status = value
-							pa.Pid = project.Id
-							pa.Pname = project.Name
-							p = append(p, pa)
-						}
-
-					}
-				}
-			}
-			beego.Info(p)
-			c.SetJson(0, p, "")
-			return
-		} else {
-			c.SetJson(1, ss, "no agent")
-			return
+		i, err := db.QueryRows(&projects, "SELECT * FROM `project` WHERE `p2p` = 1 ")
+		if i <= 0 || err != nil {
+			return ctx.SetJson(1, ss, "no agent")
 		}
-	} else if projectId != "" && searchtype == "1" {
-		o := orm.NewOrm()
-		var projects []models.Project
-		ss := map[string]string{}
-		i, err := o.Raw("SELECT * FROM `project` WHERE `id` = ?   ", projectId).QueryRows(&projects)
-		if i > 0 && err == nil {
-			for _, project := range projects {
-				s := components.BaseComponents{}
-				s.SetProject(&project)
-				ips := s.GetHostIps()
-				proRes := init_sever.P2pSvc.CheckAllClient(ips)
-				for key, value := range proRes {
+		for _, project := range projects {
+			s := components.BaseComponents{}
+			s.SetProject(&project)
+			ips := s.GetHostIps()
+			proRes := init_sever.P2pSvc.CheckAllClient(ips)
+			for key, value := range proRes {
+				if value == "dead" {
 					if !common.InList(key, ss) {
 						ss[key] = value
+						p = append(p, P2pinfo{
+							Host:   key,
+							Status: value,
+							Pid:    project.Id,
+							Pname:  project.Name,
+						})
 					}
 				}
 			}
-			c.SetJson(0, ss, "")
-			return
-		} else {
-			c.SetJson(1, ss, "no agent")
-			return
 		}
+		logger.Info(p)
+		return ctx.SetJson(0, p, "")
 	}
-	return
+
+	if projectId != "" && searchtype == "1" {
+		var projects []models.Project
+		ss := map[string]string{}
+		i, err := db.QueryRows(&projects, "SELECT * FROM `project` WHERE `id` = ?   ", projectId)
+		if i <= 0 || err != nil {
+			return ctx.SetJson(1, ss, "no agent")
+		}
+		for _, project := range projects {
+			s := components.BaseComponents{}
+			s.SetProject(&project)
+			ips := s.GetHostIps()
+			proRes := init_sever.P2pSvc.CheckAllClient(ips)
+			for key, value := range proRes {
+				if !common.InList(key, ss) {
+					ss[key] = value
+				}
+			}
+		}
+		return ctx.SetJson(0, ss, "")
+	}
+	return nil
 }

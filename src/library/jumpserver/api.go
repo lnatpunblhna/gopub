@@ -2,7 +2,7 @@ package jumpserver
 
 import (
 	"encoding/json"
-	"github.com/astaxie/beego"
+	"github.com/linclin/gopub/src/library/config"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -27,8 +27,8 @@ type node struct {
 }
 
 func auth() (string, error) {
-	auth_api_url := beego.AppConfig.String("jumpserver") + beego.AppConfig.String("jump_auth_api")
-	param := "{\"username\": \"" + beego.AppConfig.String("jump_username") + "\", \"password\": \"" + beego.AppConfig.String("jump_password") + "\"}"
+	auth_api_url := config.String("jumpserver") + config.String("jump_auth_api")
+	param := "{\"username\": \"" + config.String("jump_username") + "\", \"password\": \"" + config.String("jump_password") + "\"}"
 	resp, _ := http.Post(auth_api_url, "application/json", strings.NewReader(param))
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
@@ -45,7 +45,7 @@ func GetGroups() (map[string]string, error) {
 		return nil, err
 	}
 
-	jumpserver_grouplist_api_url := beego.AppConfig.String("jumpserver") + beego.AppConfig.String("jump_grouplist_api")
+	jumpserver_grouplist_api_url := config.String("jumpserver") + config.String("jump_grouplist_api")
 
 	client := &http.Client{}
 	request, err := http.NewRequest("GET", jumpserver_grouplist_api_url, strings.NewReader(""))
@@ -77,7 +77,7 @@ func GetIpsByGroupid(group_id string) (map[string]string, error) {
 		return nil, err
 	}
 
-	jumpserver_grouplist_api_url := beego.AppConfig.String("jumpserver") + strings.Replace(beego.AppConfig.String("jump_groupid2ips_api"), "%id", string(group_id), -1)
+	jumpserver_grouplist_api_url := config.String("jumpserver") + strings.Replace(config.String("jump_groupid2ips_api"), "%id", string(group_id), -1)
 	client := &http.Client{}
 	request, err := http.NewRequest("GET", jumpserver_grouplist_api_url, strings.NewReader(""))
 	request.Header.Set("Content-Type", "application/json")

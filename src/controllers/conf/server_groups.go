@@ -1,26 +1,21 @@
 package confcontrollers
 
 import (
-	"github.com/astaxie/beego"
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
+	"github.com/linclin/gopub/src/library/config"
 	"github.com/linclin/gopub/src/library/jumpserver"
 )
 
-type ServerGroupsController struct {
-	controllers.BaseController
-}
-
-func (c *ServerGroupsController) Get() {
-	if c.User == nil || c.User.Id == 0 {
-		c.SetJson(2, nil, "not login")
-		return
+func ServerGroups(c echo.Context) error {
+	ctx := controllers.New(c)
+	if ctx.User == nil || ctx.User.Id == 0 {
+		return ctx.SetJson(2, nil, "not login")
 	}
-	enableJumpserver, _ := beego.AppConfig.Bool("enableJumpserver")
-	if enableJumpserver == true {
+	enableJumpserver, _ := config.Bool("enableJumpserver")
+	if enableJumpserver {
 		group2id, _ := jumpserver.GetGroups()
-		c.SetJson(0, group2id, "")
-	} else {
-		c.SetJson(0, nil, "")
+		return ctx.SetJson(0, group2id, "")
 	}
-	return
+	return ctx.SetJson(0, nil, "")
 }

@@ -1,68 +1,63 @@
 package apicontrollers
 
 import (
-	"github.com/linclin/gopub/src/library/common"
+	"net/http"
 	"runtime"
 
-	"github.com/astaxie/beego"
-
 	"github.com/dgrijalva/jwt-go"
+	"github.com/labstack/echo/v4"
+	"github.com/linclin/gopub/src/library/common"
+	"github.com/linclin/gopub/src/library/config"
+	"github.com/linclin/gopub/src/library/logger"
 )
 
-// TODO 另一版的api验证 废弃
-// 基类
-type BaseApiController struct {
-	beego.Controller
+// appIdKey 是 JWT 签发方（appid）在请求上下文中的键。
+// 原实现用包级变量 var AppId int 保存，多请求并发时会互相覆盖，改为按请求存取。
+const appIdKey = "gopub_app_id"
+
+// AppIdFrom 返回当前请求经 JWT 校验得到的 appid
+func AppIdFrom(c echo.Context) int {
+	if v, ok := c.Get(appIdKey).(int); ok {
+		return v
+	}
+	return 0
 }
 
-var AppId int
+// ApiAuth 校验 Json Web Token，替代原 BaseApiController.Prepare。
+func ApiAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		defer func() {
+			if panicErr := recover(); panicErr != nil {
+				buf := make([]byte, 1024)
+				n := runtime.Stack(buf, false)
+				logger.Error("控制器错误:", panicErr, string(buf[0:n]))
+			}
+		}()
 
-// Prepare implemented Prepare method for baseRouter.
-func (c *BaseApiController) Prepare() {
-	//获取panic
-	defer func() {
-		if panic_err := recover(); panic_err != nil {
-			var buf []byte = make([]byte, 1024)
-			runtimec := runtime.Stack(buf, false)
-			beego.Error("控制器错误:", panic_err, string(buf[0:runtimec]))
+		//正式环境则需要验证Token并且需要使用HTTPS访问
+		//if config.RunMode() == "prod" {
+		//	if !c.IsTLS() {
+		//		return c.JSON(http.StatusOK, map[string]string{"errcode": "101", "errmsg": "请使用HTTPS请求API"})
+		//	}
+		//}
 
-			//c.Data["json"] = map[string]string{
-			//	"Error":  string(buf[0:runtimec]),
-			//	"Result": common.GetString(panic_err),
-			//}
-			//c.ServeJSON()
-			//c.StopRun()
+		//验证token
+		tokenString := c.Request().Header.Get("Authorization")
+		if tokenString == "" {
+			return c.JSON(http.StatusOK, map[string]string{"errcode": "102", "errmsg": "token错误"})
 		}
-	}()
-
-	//正式环境则需要验证Token并且需要使用HTTPS访问
-	//if beego.BConfig.RunMode == "prod" {
-	if c.Ctx.Input.IsSecure() == false {
-		//c.Data["json"] = map[string]string{"errcode": "101", "errmsg": "请使用HTTPS请求API:" + c.Ctx.Input.Site() + ":" + beego.AppConfig.String("HttpsPort")}
-		//c.ServeJSON()
-		//c.StopRun()
-	}
-	//验证token
-	tokenString := c.Ctx.Input.Header("Authorization")
-	if tokenString == "" {
-		c.Data["json"] = map[string]string{"errcode": "102", "errmsg": "token错误"}
-		c.ServeJSON()
-		c.StopRun()
-	}
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return []byte(beego.AppConfig.String("SecretKey")), nil
-	})
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if ok {
-		AppId = common.GetInt(claims["iss"])
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			return []byte(config.String("SecretKey")), nil
+		})
+		// 原实现在 claims 断言失败时会放行请求，这里统一按验证失败处理
 		if err != nil {
-			c.Data["json"] = map[string]string{"errcode": "103", "errmsg": "token验证失败"}
-			c.ServeJSON()
-			c.StopRun()
+			return c.JSON(http.StatusOK, map[string]string{"errcode": "103", "errmsg": "token验证失败"})
 		}
-	} else {
-
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return c.JSON(http.StatusOK, map[string]string{"errcode": "103", "errmsg": "token验证失败"})
+		}
+		c.Set(appIdKey, common.GetInt(claims["iss"]))
+		return next(c)
 	}
-	//}
-
 }

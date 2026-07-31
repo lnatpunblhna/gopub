@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
+	"github.com/linclin/gopub/src/library/config"
+	"github.com/linclin/gopub/src/library/db"
+	"github.com/linclin/gopub/src/library/logger"
 )
 
 type emailConfig struct {
@@ -22,10 +23,11 @@ func init() {
 
 }
 func Check_p2p_angent_status() error {
-	beego.Info("p2p agent自动任务开始" + time.Now().Format("2006-01-02 15:04:05"))
+	logger.Info("p2p agent自动任务开始" + time.Now().Format("2006-01-02 15:04:05"))
 	var projects []models.Project
-	o := orm.NewOrm()
-	num, err := o.Raw("SELECT * FROM `project` WHERE  p2p=1").QueryRows(&projects)
+	num, err := db.QueryRows(&projects, "SELECT * FROM `project` WHERE  p2p=1")
+	// 注意：此处条件沿用原实现（err != nil），看起来应为 err == nil，
+	// 但该定时任务在 main 中已被注释停用，本次迁移不改动其判断逻辑。
 	if num > 0 && err != nil {
 		for _, project := range projects {
 			s := components.BaseComponents{}
@@ -40,11 +42,11 @@ func Check_p2p_angent_status() error {
 				}
 			}
 			if len(reIps) > 0 {
-				AgentDestDir := beego.AppConfig.String("AgentDestDir")
+				AgentDestDir := config.String("AgentDestDir")
 				s.StartP2pAgent(reIps, AgentDestDir)
 			}
 		}
 	}
-	beego.Info("p2p agent自动任务结束" + time.Now().Format("2006-01-02 15:04:05"))
+	logger.Info("p2p agent自动任务结束" + time.Now().Format("2006-01-02 15:04:05"))
 	return nil
 }

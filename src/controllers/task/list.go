@@ -1,38 +1,40 @@
 package taskcontrollers
 
 import (
-	"github.com/astaxie/beego/orm"
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/common"
+	"github.com/linclin/gopub/src/library/db"
 )
 
-type ListController struct {
-	controllers.BaseController
-}
-
-func (c *ListController) Get() {
-	page, _ := c.GetInt("page", 0)
+func List(c echo.Context) error {
+	ctx := controllers.New(c)
+	page, _ := ctx.GetInt("page", 0)
 	start := 0
-	length, _ := c.GetInt("length", 15)
+	length, _ := ctx.GetInt("length", 15)
 	if page > 0 {
 		start = (page - 1) * length
 	}
-	selectInfo := c.GetString("select_info")
+	// 原实现把 select_info 直接拼进 SQL，这里改为参数化查询避免注入
+	selectInfo := ctx.GetString("select_info")
 	where := ""
+	args := []interface{}{}
 	if selectInfo != "" {
-		where = "  and( project.`name` LIKE '%" + selectInfo + "%' or `user`.realname LIKE '%" + selectInfo + "%'  or task.title LIKE '%" + selectInfo + "%'  )"
+		where += "  and( project.`name` LIKE ? or `user`.realname LIKE ?  or task.title LIKE ?  )"
+		like := "%" + selectInfo + "%"
+		args = append(args, like, like, like)
 	}
-	myUserId, _ := c.GetInt("my", 0)
+	myUserId, _ := ctx.GetInt("my", 0)
 	if myUserId != 0 {
-		where = where + "  and task.user_id=" + common.GetString(myUserId)
+		where += "  and task.user_id= ? "
+		args = append(args, myUserId)
 	}
-	var projects []orm.Params
-	o := orm.NewOrm()
 
-	o.Raw("SELECT task.id,project.name,project.name,project.level,`user`.realname,task.title,task.action,task.link_id,task.is_run,task.enable_rollback,task.updated_at,task.branch,task.commit_id,task.pms_uwork_id,task.pms_batch_id,task.`status` FROM `task` LEFT JOIN project on task.project_id=project.id   LEFT JOIN `user` on task.user_id=user.id where 1=1 "+where+" order by task.id DESC  LIMIT ? ,?", start, length).Values(&projects)
-	var count []orm.Params
+	listArgs := append(append([]interface{}{}, args...), start, length)
+	projects, _ := db.Values("SELECT task.id,project.name,project.name,project.level,`user`.realname,task.title,task.action,task.link_id,task.is_run,task.enable_rollback,task.updated_at,task.branch,task.commit_id,task.pms_uwork_id,task.pms_batch_id,task.`status` FROM `task` LEFT JOIN project on task.project_id=project.id   LEFT JOIN `user` on task.user_id=user.id where 1=1 "+where+" order by task.id DESC  LIMIT ? ,?", listArgs...)
+
 	total := 0
-	o.Raw("SELECT count(task.id) FROM `task` LEFT JOIN project on task.project_id=project.id   LEFT JOIN `user` on task.user_id=user.id where 1=1 " + where).Values(&count)
+	count, _ := db.Values("SELECT count(task.id) FROM `task` LEFT JOIN project on task.project_id=project.id   LEFT JOIN `user` on task.user_id=user.id where 1=1 "+where, args...)
 	if len(count) > 0 {
 		total = common.GetInt(count[0]["count(task.id)"])
 	}
@@ -47,30 +49,22 @@ func (c *ListController) Get() {
 		if common.GetInt(project["level"]) == 2 {
 			project["name"] = common.GetString(project["name"]) + "-预发布环境"
 		}
-
 	}
-	c.SetJson(0, map[string]interface{}{"total": total, "currentPage": page, "table_data": projects}, "")
-
-	return
-
+	return ctx.SetJson(0, map[string]interface{}{"total": total, "currentPage": page, "table_data": projects}, "")
 }
+
 func GetTaskStatus(status int) string {
 	switch status {
 	case 0:
 		return "新建提交"
-		break
 	case 1:
 		return "新建提交"
-		break
 	case 2:
 		return "审核拒绝"
-		break
 	case 3:
 		return "上线完成"
-		break
 	case 4:
 		return "上线失败"
-		break
 	}
 	return ""
 }

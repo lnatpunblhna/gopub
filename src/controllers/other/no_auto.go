@@ -2,36 +2,33 @@ package othercontrollers
 
 import (
 	"fmt"
+
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/common"
-
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
+	"github.com/linclin/gopub/src/library/db"
+	"github.com/linclin/gopub/src/library/logger"
 )
 
-type NoAutoController struct {
-	controllers.BaseController
-}
-
 // 这里是查询每天 每周 每月 未进入预发布的项目
-func (c *NoAutoController) Get() {
-	taskType := c.GetString("taskType")
-	beego.Info(taskType)
-	o := orm.NewOrm()
+func NoAuto(c echo.Context) error {
+	ctx := controllers.New(c)
+	taskType := ctx.GetString("taskType")
+	logger.Info(taskType)
 	sql := "SELECT project.id ,project.name  FROM `task` LEFT JOIN project ON task.project_id=project.id WHERE  project.level=2 %s group BY project.id"
-	var proIds []orm.Params
-	var proIds1 []orm.Params
+	var proIds []db.Params
+	var proIds1 []db.Params
 	if taskType == "day" {
-		o.Raw(fmt.Sprintf(sql, " and TO_DAYS(now()) - TO_DAYS(task.updated_at) = 0 ")).Values(&proIds)
-		o.Raw(fmt.Sprintf(sql, " and TO_DAYS(now()) - TO_DAYS(task.updated_at) = 0  and task.user_id=1")).Values(&proIds)
+		proIds, _ = db.Values(fmt.Sprintf(sql, " and TO_DAYS(now()) - TO_DAYS(task.updated_at) = 0 "))
+		proIds, _ = db.Values(fmt.Sprintf(sql, " and TO_DAYS(now()) - TO_DAYS(task.updated_at) = 0  and task.user_id=1"))
 	} else if taskType == "week" {
-		o.Raw(fmt.Sprintf(sql, " and YEARWEEK(date_format(task.updated_at,'%Y-%m-%d')) = YEARWEEK(now()) ")).Values(&proIds)
-		o.Raw(fmt.Sprintf(sql, " and YEARWEEK(date_format(task.updated_at,'%Y-%m-%d')) = YEARWEEK(now()) and task.user_id=1")).Values(&proIds1)
+		proIds, _ = db.Values(fmt.Sprintf(sql, " and YEARWEEK(date_format(task.updated_at,'%Y-%m-%d')) = YEARWEEK(now()) "))
+		proIds1, _ = db.Values(fmt.Sprintf(sql, " and YEARWEEK(date_format(task.updated_at,'%Y-%m-%d')) = YEARWEEK(now()) and task.user_id=1"))
 	} else {
-		o.Raw(fmt.Sprintf(sql, " and date_format(task.updated_at,'%Y-%m')=date_format(now(),'%Y-%m') ")).Values(&proIds)
-		o.Raw(fmt.Sprintf(sql, " and date_format(task.updated_at,'%Y-%m')=date_format(now(),'%Y-%m')  and task.user_id=1")).Values(&proIds1)
+		proIds, _ = db.Values(fmt.Sprintf(sql, " and date_format(task.updated_at,'%Y-%m')=date_format(now(),'%Y-%m') "))
+		proIds1, _ = db.Values(fmt.Sprintf(sql, " and date_format(task.updated_at,'%Y-%m')=date_format(now(),'%Y-%m')  and task.user_id=1"))
 	}
-	res := []orm.Params{}
+	res := []db.Params{}
 	for _, proId := range proIds {
 		id := common.GetInt(proId["id"])
 		isIn := false
@@ -45,7 +42,5 @@ func (c *NoAutoController) Get() {
 			res = append(res, proId)
 		}
 	}
-	c.SetJson(0, res, "")
-	return
-
+	return ctx.SetJson(0, res, "")
 }

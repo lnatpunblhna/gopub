@@ -5,7 +5,7 @@ import (
 	"github.com/linclin/gopub/src/library/common"
 	"strings"
 
-	"github.com/astaxie/beego/orm"
+	"github.com/linclin/gopub/src/library/db"
 )
 
 /**
@@ -36,13 +36,10 @@ type IPagingCondition interface {
  * 单表增删改
  */
 type Paging struct {
-	db orm.Ormer
 }
 
-func NewPaging(db orm.Ormer) Paging {
-	return Paging{
-		db: db,
-	}
+func NewPaging() Paging {
+	return Paging{}
 }
 
 /**
@@ -119,14 +116,14 @@ func (paging Paging) SelectList(schemaId string, columnIds []string, condition c
 	schema := GetSchema(schemaId)
 	columns := FillColumn(schema, columnIds)
 	conditions := FillCondition(schema, condition)
-	rawData := GetListTable(paging.db, schema, columns, conditions, start, pageSize, orderby, isAsc)
+	rawData := GetListTable(schema, columns, conditions, start, pageSize, orderby, isAsc)
 	return fillList(schema, rawData, columns)
 }
 
 /**
  * 调用通用查询配置文件中设定的handler类对列进行处理
  */
-func fillList(schema common.Info, rawData []orm.ParamsList, columns []common.Info) [][]string {
+func fillList(schema common.Info, rawData []db.ParamsList, columns []common.Info) [][]string {
 	result := [][]string{}
 	for _, row := range rawData {
 		rowNew := []string{}
@@ -165,5 +162,5 @@ func (paging Paging) Count(schemaId string, columnIds []string, condition common
 	schema := GetSchema(schemaId)
 	columns := FillColumn(schema, columnIds)
 	conditions := FillCondition(schema, condition)
-	return GetCount(paging.db, schema, columns, conditions)
+	return GetCount(schema, columns, conditions)
 }

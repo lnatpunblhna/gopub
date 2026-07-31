@@ -1,8 +1,11 @@
 package components
 
 import (
-	"github.com/astaxie/beego"
+	"context"
+
 	"github.com/bndr/gojenkins"
+	"github.com/linclin/gopub/src/library/config"
+	"github.com/linclin/gopub/src/library/logger"
 	"net/url"
 	"regexp"
 	"strings"
@@ -34,18 +37,19 @@ func (c *BasJenkins) GetCommitList(count int) ([]JenkinData, error) {
 	jobs := strings.Split(u.Path, "/job/")
 	job := strings.Trim(jobs[1], "/")
 	jenkins := gojenkins.CreateJenkins(nil, jenkinsUrl, "")
-	if beego.AppConfig.String("JenkinsUserName") != "" {
-		jenkins = gojenkins.CreateJenkins(nil, jenkinsUrl, beego.AppConfig.String("JenkinsUserName"), beego.AppConfig.String("JenkinsPwd"))
+	if config.String("JenkinsUserName") != "" {
+		jenkins = gojenkins.CreateJenkins(nil, jenkinsUrl, config.String("JenkinsUserName"), config.String("JenkinsPwd"))
 	}
-	_, err = jenkins.Init()
+	ctx := context.Background()
+	_, err = jenkins.Init(ctx)
 	if err != nil {
-		beego.Error(err, "Jenkins Initialization failed")
+		logger.Error(err, "Jenkins Initialization failed")
 		return list, err
 
 	}
-	builds, _ := jenkins.GetAllBuildIds(job)
+	builds, _ := jenkins.GetAllBuildIds(ctx, job)
 	for _, b := range builds {
-		build, _ := jenkins.GetBuild(job, b.Number)
+		build, _ := jenkins.GetBuild(ctx, job, b.Number)
 		if len(build.Raw.Artifacts) == 0 {
 			the_base := strings.Split(build.Base, "/")
 			the_base_id := the_base[len(the_base)-1]

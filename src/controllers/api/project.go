@@ -3,75 +3,51 @@ package apicontrollers
 import (
 	"encoding/json"
 	"errors"
-	"github.com/linclin/gopub/src/models"
+	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/labstack/echo/v4"
+	"github.com/linclin/gopub/src/controllers"
+	"github.com/linclin/gopub/src/models"
 )
 
 // oprations for Project
-type ProjectController struct {
-	BaseApiController
-}
+//
+// 注意：原 beego 版本的 router.go 只把 /v1/token 与 /v1/task 挂进了命名空间，
+// 并未注册 /v1/project，因此本文件的接口原本就不可达。
+// 迁移后保持一致，不注册路由，仅保留实现。
 
-func (c *ProjectController) URLMapping() {
-	c.Mapping("Post", c.Post)
-	c.Mapping("GetOne", c.GetOne)
-	c.Mapping("GetAll", c.GetAll)
-	c.Mapping("Put", c.Put)
-	c.Mapping("Delete", c.Delete)
-}
-
-// @Title Post
-// @Description create Project
-// @Param	body		body 	models.Project	true		"body for Project content"
-// @Success 201 {int} models.Project
-// @Failure 403 body is empty
+// ProjectPost 创建 Project
 // @router / [post]
-func (c *ProjectController) Post() {
+func ProjectPost(c echo.Context) error {
+	ctx := controllers.New(c)
 	var v models.Project
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if _, err := models.AddProject(&v); err == nil {
-			c.Ctx.Output.SetStatus(201)
-			c.Data["json"] = v
-		} else {
-			c.Data["json"] = err.Error()
-		}
-	} else {
-		c.Data["json"] = err.Error()
+	if err := json.Unmarshal(ctx.RequestBody(), &v); err != nil {
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	if _, err := models.AddProject(&v); err != nil {
+		return ctx.Json(err.Error())
+	}
+	return ctx.JsonStatus(http.StatusCreated, v)
 }
 
-// @Title Get
-// @Description get Project by id
-// @Param	id		path 	string	true		"The key for staticblock"
-// @Success 200 {object} models.Project
-// @Failure 403 :id is empty
+// ProjectGetOne 按 id 获取 Project
 // @router /:id [get]
-func (c *ProjectController) GetOne() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
+func ProjectGetOne(c echo.Context) error {
+	ctx := controllers.New(c)
+	id, _ := strconv.Atoi(c.Param("id"))
 	v, err := models.GetProjectById(id)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = v
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	return ctx.Json(v)
 }
 
-// @Title Get All
-// @Description get Project
-// @Param	query	query	string	false	"Filter. e.g. col1:v1,col2:v2 ..."
-// @Param	fields	query	string	false	"Fields returned. e.g. col1,col2 ..."
-// @Param	sortby	query	string	false	"Sorted-by fields. e.g. col1,col2 ..."
-// @Param	order	query	string	false	"Order corresponding to each sortby field, if single value, apply to all sortby fields. e.g. desc,asc ..."
-// @Param	limit	query	string	false	"Limit the size of result set. Must be an integer"
-// @Param	offset	query	string	false	"Start position of result set. Must be an integer"
-// @Success 200 {object} models.Project
-// @Failure 403
+// ProjectGetAll 通用条件查询 Project
 // @router / [get]
-func (c *ProjectController) GetAll() {
+func ProjectGetAll(c echo.Context) error {
+	ctx := controllers.New(c)
 	var fields []string
 	var sortby []string
 	var order []string
@@ -80,33 +56,31 @@ func (c *ProjectController) GetAll() {
 	var offset int64 = 0
 
 	// fields: col1,col2,entity.col3
-	if v := c.GetString("fields"); v != "" {
+	if v := ctx.GetString("fields"); v != "" {
 		fields = strings.Split(v, ",")
 	}
 	// limit: 10 (default is 10)
-	if v, err := c.GetInt64("limit"); err == nil {
+	if v, err := ctx.GetInt64("limit"); err == nil {
 		limit = v
 	}
 	// offset: 0 (default is 0)
-	if v, err := c.GetInt64("offset"); err == nil {
+	if v, err := ctx.GetInt64("offset"); err == nil {
 		offset = v
 	}
 	// sortby: col1,col2
-	if v := c.GetString("sortby"); v != "" {
+	if v := ctx.GetString("sortby"); v != "" {
 		sortby = strings.Split(v, ",")
 	}
 	// order: desc,asc
-	if v := c.GetString("order"); v != "" {
+	if v := ctx.GetString("order"); v != "" {
 		order = strings.Split(v, ",")
 	}
 	// query: k:v,k:v
-	if v := c.GetString("query"); v != "" {
+	if v := ctx.GetString("query"); v != "" {
 		for _, cond := range strings.Split(v, ",") {
 			kv := strings.Split(cond, ":")
 			if len(kv) != 2 {
-				c.Data["json"] = errors.New("Error: invalid query key/value pair")
-				c.ServeJSON()
-				return
+				return ctx.Json(errors.New("Error: invalid query key/value pair").Error())
 			}
 			k, v := kv[0], kv[1]
 			query[k] = v
@@ -115,49 +89,33 @@ func (c *ProjectController) GetAll() {
 
 	l, err := models.GetAllProject(query, fields, sortby, order, offset, limit)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = l
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	return ctx.Json(l)
 }
 
-// @Title Update
-// @Description update the Project
-// @Param	id		path 	string	true		"The id you want to update"
-// @Param	body		body 	models.Project	true		"body for Project content"
-// @Success 200 {object} models.Project
-// @Failure 403 :id is not int
+// ProjectPut 更新 Project
 // @router /:id [put]
-func (c *ProjectController) Put() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
+func ProjectPut(c echo.Context) error {
+	ctx := controllers.New(c)
+	id, _ := strconv.Atoi(c.Param("id"))
 	v := models.Project{Id: id}
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if err := models.UpdateProjectById(&v); err == nil {
-			c.Data["json"] = "OK"
-		} else {
-			c.Data["json"] = err.Error()
-		}
-	} else {
-		c.Data["json"] = err.Error()
+	if err := json.Unmarshal(ctx.RequestBody(), &v); err != nil {
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	if err := models.UpdateProjectById(&v); err != nil {
+		return ctx.Json(err.Error())
+	}
+	return ctx.Json("OK")
 }
 
-// @Title Delete
-// @Description delete the Project
-// @Param	id		path 	string	true		"The id you want to delete"
-// @Success 200 {string} delete success!
-// @Failure 403 id is empty
+// ProjectDelete 删除 Project
 // @router /:id [delete]
-func (c *ProjectController) Delete() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	if err := models.DeleteProject(id); err == nil {
-		c.Data["json"] = "OK"
-	} else {
-		c.Data["json"] = err.Error()
+func ProjectDelete(c echo.Context) error {
+	ctx := controllers.New(c)
+	id, _ := strconv.Atoi(c.Param("id"))
+	if err := models.DeleteProject(id); err != nil {
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	return ctx.Json("OK")
 }

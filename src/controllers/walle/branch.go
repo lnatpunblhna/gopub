@@ -1,32 +1,25 @@
 package wallecontrollers
 
 import (
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/components"
 	"github.com/linclin/gopub/src/models"
 )
 
-type BranchController struct {
-	controllers.BaseController
-}
-
-func (c *BranchController) Get() {
-	if c.Project == nil || c.Project.Id == 0 {
-		c.SetJson(1, nil, "Parameter error")
-		return
+func Branch(c echo.Context) error {
+	ctx := controllers.New(c)
+	if ctx.Project == nil || ctx.Project.Id == 0 {
+		return ctx.SetJson(1, nil, "Parameter error")
 	}
 	s := components.BaseComponents{}
-	s.SetProject(c.Project)
+	s.SetProject(ctx.Project)
 	s.SetTask(&models.Task{})
 	g := components.BaseGit{}
 	g.SetBaseComponents(s)
 	res, err := g.GetBranchList()
 	if err != nil {
-		c.SetJson(1, nil, "获取分支错误—"+err.Error())
-		return
-	} else {
-		c.SetJson(0, res, "")
-		return
+		return ctx.SetJson(1, nil, "获取分支错误—"+err.Error())
 	}
-
+	return ctx.SetJson(0, res, "")
 }

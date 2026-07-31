@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/astaxie/beego"
 	"github.com/cucued/sshexec"
+	"github.com/linclin/gopub/src/library/config"
 	"github.com/linclin/gopub/src/library/p2p/init_sever"
 	"github.com/linclin/gopub/src/library/p2p/server"
 	"os/exec"
@@ -132,7 +132,7 @@ func TransP2pReName(id string, hosts []string, user string, localFilePath string
 	sshExecAgent.Worker = 10
 	sshExecAgent.TimeOut = 30 * time.Second
 	sshExecAgent.Algorithm = algorithm
-	port, _ := beego.AppConfig.Int("SshPort")
+	port, _ := config.Int("SshPort")
 	_, err := sshExecAgent.SshHostByKey(hosts, port, user, cmd)
 	return err
 }

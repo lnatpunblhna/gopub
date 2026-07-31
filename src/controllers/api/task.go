@@ -3,113 +3,75 @@ package apicontrollers
 import (
 	"encoding/json"
 	"errors"
-	"github.com/linclin/gopub/src/models"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/labstack/echo/v4"
+	"github.com/linclin/gopub/src/controllers"
+	"github.com/linclin/gopub/src/models"
 )
 
 // oprations for Task
-type TaskController struct {
-	BaseApiController
-}
 
-func (c *TaskController) URLMapping() {
-	c.Mapping("Post", c.Post)
-	c.Mapping("GetOne", c.GetOne)
-	c.Mapping("GetAll", c.GetAllAndProName)
-	c.Mapping("Put", c.Put)
-	c.Mapping("Delete", c.Delete)
-}
-
-// @Title Post
-// @Description create Task
-// @Param	body		body 	models.Task	true		"body for Task content"
-// @Success 201 {int} models.Task
-// @Failure 403 body is empty
+// TaskPost 创建 Task
 // @router / [post]
-func (c *TaskController) Post() {
+func TaskPost(c echo.Context) error {
+	ctx := controllers.New(c)
 	var v models.Task
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if _, err := models.AddTask(&v); err == nil {
-			c.Ctx.Output.SetStatus(201)
-			c.Data["json"] = v
-		} else {
-			c.Data["json"] = err.Error()
-		}
-	} else {
-		c.Data["json"] = err.Error()
+	if err := json.Unmarshal(ctx.RequestBody(), &v); err != nil {
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	if _, err := models.AddTask(&v); err != nil {
+		return ctx.Json(err.Error())
+	}
+	return ctx.JsonStatus(http.StatusCreated, v)
 }
 
-// @Title Get
-// @Description get Task by id
-// @Param	id		path 	string	true		"The key for staticblock"
-// @Success 200 {object} models.Task
-// @Failure 403 :id is empty
+// TaskGetOne 按 id 获取 Task
 // @router /:id [get]
-func (c *TaskController) GetOne() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
+func TaskGetOne(c echo.Context) error {
+	ctx := controllers.New(c)
+	id, _ := strconv.Atoi(c.Param("id"))
 	v, err := models.GetTaskById(id)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = v
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	return ctx.Json(v)
 }
 
-// @Title Get All
-// @Description get Task
-// @Param	pro_name	query	string	false	"Filter. e.g. col1:v1,col2:v2 ..."
-// @Param	startTime	query	string	false	"Fields returned. e.g. col1,col2 ..."
-// @Param	endTime	query	string	false	"Sorted-by fields. e.g. col1,col2 ..."
-// @Success 200 {object} models.Task
-// @Failure 403
+// TaskGetAllAndProName 按项目名与时间区间查询已上线任务
 // @router / [get]
-func (c *TaskController) GetAllAndProName() {
-	startDate := c.GetString("startTime")
-	endDate := c.GetString("endTime")
-	projectName := c.GetString("project_name")
+func TaskGetAllAndProName(c echo.Context) error {
+	ctx := controllers.New(c)
+	startDate := ctx.GetString("startTime")
+	endDate := ctx.GetString("endTime")
+	projectName := ctx.GetString("project_name")
 	if startDate != "" {
-		_, err := time.Parse("2006-01-02 15:04:05", startDate)
-		if err != nil {
-			c.Data["json"] = map[string]string{"errcode": "103", "errmsg": "start时间格式不合法"}
-			c.ServeJSON()
-			return
+		if _, err := time.Parse("2006-01-02 15:04:05", startDate); err != nil {
+			return ctx.Json(map[string]string{"errcode": "103", "errmsg": "start时间格式不合法"})
 		}
 	}
 	if endDate != "" {
-		_, err := time.Parse("2006-01-02 15:04:05", endDate)
-		if err != nil {
-			c.Data["json"] = map[string]string{"errcode": "104", "errmsg": "end时间格式不合法"}
-			c.ServeJSON()
-			return
+		if _, err := time.Parse("2006-01-02 15:04:05", endDate); err != nil {
+			return ctx.Json(map[string]string{"errcode": "104", "errmsg": "end时间格式不合法"})
 		}
 	}
 	l, err := models.GetAllTaskAndPro(projectName, startDate, endDate)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = l
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	return ctx.Json(l)
 }
 
-// @Title Get All
-// @Description get Task
-// @Param	query	query	string	false	"Filter. e.g. col1:v1,col2:v2 ..."
-// @Param	fields	query	string	false	"Fields returned. e.g. col1,col2 ..."
-// @Param	sortby	query	string	false	"Sorted-by fields. e.g. col1,col2 ..."
-// @Param	order	query	string	false	"Order corresponding to each sortby field, if single value, apply to all sortby fields. e.g. desc,asc ..."
-// @Param	limit	query	string	false	"Limit the size of result set. Must be an integer"
-// @Param	offset	query	string	false	"Start position of result set. Must be an integer"
-// @Success 200 {object} models.Task
-// @Failure 403
-// @router / [get]
-func (c *TaskController) GetAll() {
+// TaskGetAll 通用条件查询 Task。
+//
+// 原 beego 版本中 GET /v1/task 已被 TaskGetAllAndProName 占用
+// （URLMapping 把 "GetAll" 映射到了 GetAllAndProName），该接口实际不可达，
+// 迁移后同样不注册路由，保留实现以备后用。
+func TaskGetAll(c echo.Context) error {
+	ctx := controllers.New(c)
 	var fields []string
 	var sortby []string
 	var order []string
@@ -118,33 +80,31 @@ func (c *TaskController) GetAll() {
 	var offset int64 = 0
 
 	// fields: col1,col2,entity.col3
-	if v := c.GetString("fields"); v != "" {
+	if v := ctx.GetString("fields"); v != "" {
 		fields = strings.Split(v, ",")
 	}
 	// limit: 10 (default is 10)
-	if v, err := c.GetInt64("limit"); err == nil {
+	if v, err := ctx.GetInt64("limit"); err == nil {
 		limit = v
 	}
 	// offset: 0 (default is 0)
-	if v, err := c.GetInt64("offset"); err == nil {
+	if v, err := ctx.GetInt64("offset"); err == nil {
 		offset = v
 	}
 	// sortby: col1,col2
-	if v := c.GetString("sortby"); v != "" {
+	if v := ctx.GetString("sortby"); v != "" {
 		sortby = strings.Split(v, ",")
 	}
 	// order: desc,asc
-	if v := c.GetString("order"); v != "" {
+	if v := ctx.GetString("order"); v != "" {
 		order = strings.Split(v, ",")
 	}
 	// query: k:v,k:v
-	if v := c.GetString("query"); v != "" {
+	if v := ctx.GetString("query"); v != "" {
 		for _, cond := range strings.Split(v, ",") {
 			kv := strings.Split(cond, ":")
 			if len(kv) != 2 {
-				c.Data["json"] = errors.New("Error: invalid query key/value pair")
-				c.ServeJSON()
-				return
+				return ctx.Json(errors.New("Error: invalid query key/value pair").Error())
 			}
 			k, v := kv[0], kv[1]
 			query[k] = v
@@ -153,49 +113,33 @@ func (c *TaskController) GetAll() {
 
 	l, err := models.GetAllTask(query, fields, sortby, order, offset, limit)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = l
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	return ctx.Json(l)
 }
 
-// @Title Update
-// @Description update the Task
-// @Param	id		path 	string	true		"The id you want to update"
-// @Param	body		body 	models.Task	true		"body for Task content"
-// @Success 200 {object} models.Task
-// @Failure 403 :id is not int
+// TaskPut 更新 Task
 // @router /:id [put]
-func (c *TaskController) Put() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
+func TaskPut(c echo.Context) error {
+	ctx := controllers.New(c)
+	id, _ := strconv.Atoi(c.Param("id"))
 	v := models.Task{Id: id}
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if err := models.UpdateTaskById(&v); err == nil {
-			c.Data["json"] = "OK"
-		} else {
-			c.Data["json"] = err.Error()
-		}
-	} else {
-		c.Data["json"] = err.Error()
+	if err := json.Unmarshal(ctx.RequestBody(), &v); err != nil {
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	if err := models.UpdateTaskById(&v); err != nil {
+		return ctx.Json(err.Error())
+	}
+	return ctx.Json("OK")
 }
 
-// @Title Delete
-// @Description delete the Task
-// @Param	id		path 	string	true		"The id you want to delete"
-// @Success 200 {string} delete success!
-// @Failure 403 id is empty
+// TaskDelete 删除 Task
 // @router /:id [delete]
-func (c *TaskController) Delete() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	if err := models.DeleteTask(id); err == nil {
-		c.Data["json"] = "OK"
-	} else {
-		c.Data["json"] = err.Error()
+func TaskDelete(c echo.Context) error {
+	ctx := controllers.New(c)
+	id, _ := strconv.Atoi(c.Param("id"))
+	if err := models.DeleteTask(id); err != nil {
+		return ctx.Json(err.Error())
 	}
-	c.ServeJSON()
+	return ctx.Json("OK")
 }

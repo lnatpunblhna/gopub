@@ -1,32 +1,25 @@
 package wallecontrollers
 
 import (
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/components"
 	"github.com/linclin/gopub/src/models"
 )
 
-type TagController struct {
-	controllers.BaseController
-}
-
-func (c *TagController) Get() {
-	if c.Project == nil || c.Project.Id == 0 {
-		c.SetJson(1, nil, "Parameter error")
-		return
+func Tag(c echo.Context) error {
+	ctx := controllers.New(c)
+	if ctx.Project == nil || ctx.Project.Id == 0 {
+		return ctx.SetJson(1, nil, "Parameter error")
 	}
 	s := components.BaseComponents{}
-	s.SetProject(c.Project)
+	s.SetProject(ctx.Project)
 	s.SetTask(&models.Task{})
 	g := components.BaseGit{}
 	g.SetBaseComponents(s)
 	res, err := g.GetTagList(200)
 	if err != nil {
-		c.SetJson(1, nil, "获取tag错误—"+err.Error())
-		return
-	} else {
-		c.SetJson(0, res, "")
-		return
+		return ctx.SetJson(1, nil, "获取tag错误—"+err.Error())
 	}
-
+	return ctx.SetJson(0, res, "")
 }

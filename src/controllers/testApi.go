@@ -1,20 +1,14 @@
 package controllers
 
 import (
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
+	"github.com/labstack/echo/v4"
+	"github.com/linclin/gopub/src/library/db"
 	"github.com/linclin/gopub/src/models"
 )
 
-type TestApiController struct {
-	beego.Controller
-}
-
-func (c *TestApiController) Get() {
+func TestApi(c echo.Context) error {
+	ctx := New(c)
 	var projects []models.Project
-	o := orm.NewOrm()
-	o.Raw("SELECT * FROM `project`  WHERE 1=1").QueryRows(&projects)
-	c.Data["json"] = projects
-	c.ServeJSON()
-
+	db.QueryRows(&projects, "SELECT * FROM `project`  WHERE 1=1")
+	return ctx.Json(projects)
 }

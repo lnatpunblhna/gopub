@@ -1,29 +1,30 @@
 package confcontrollers
 
 import (
-	"github.com/linclin/gopub/src/controllers"
-
 	"encoding/json"
-	"github.com/astaxie/beego"
+	"net/http"
+
+	"github.com/labstack/echo/v4"
+	"github.com/linclin/gopub/src/controllers"
+	"github.com/linclin/gopub/src/library/logger"
 	"github.com/linclin/gopub/src/models"
 )
 
-type ConfController struct {
-	controllers.BaseController
-}
-
-func (c *ConfController) Get() {
-	projectId, _ := c.GetInt("projectId", 0)
+func Conf(c echo.Context) error {
+	ctx := controllers.New(c)
+	projectId, _ := ctx.GetInt("projectId", 0)
 	project, _ := models.GetProjectById(projectId)
-	c.SetJson(0, project, "")
-	return
-
+	return ctx.SetJson(0, project, "")
 }
-func (c *ConfController) Post() {
-	//projectId,_:=c.GetInt("projectId",0)
+
+func ConfSave(c echo.Context) error {
+	ctx := controllers.New(c)
+	//projectId,_:=ctx.GetInt("projectId",0)
 	var project models.Project
-	err := json.Unmarshal(c.Ctx.Input.RequestBody, &project)
-	err = models.UpdateProjectById(&project)
-	beego.Info(err)
-	return
+	if err := json.Unmarshal(ctx.RequestBody(), &project); err != nil {
+		logger.Info(err)
+		return ctx.NoContent(http.StatusOK)
+	}
+	logger.Info(models.UpdateProjectById(&project))
+	return ctx.NoContent(http.StatusOK)
 }

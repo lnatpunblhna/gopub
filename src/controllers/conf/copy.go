@@ -3,34 +3,28 @@ package confcontrollers
 import (
 	"time"
 
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/models"
 )
 
-type CopyController struct {
-	controllers.BaseController
-}
-
-func (c *CopyController) Get() {
-	if c.User == nil || c.User.Id == 0 {
-		c.SetJson(2, nil, "not login")
-		return
+func Copy(c echo.Context) error {
+	ctx := controllers.New(c)
+	if ctx.User == nil || ctx.User.Id == 0 {
+		return ctx.SetJson(2, nil, "not login")
 	}
-	if c.Project == nil || c.Project.Id == 0 {
-		c.SetJson(1, nil, "Parameter error")
-		return
+	if ctx.Project == nil || ctx.Project.Id == 0 {
+		return ctx.SetJson(1, nil, "Parameter error")
 	}
-	c.Project.Name = c.Project.Name + " - copy"
-	c.Project.Id = 0
-	c.Project.UserId = uint(c.User.Id)
+	ctx.Project.Name = ctx.Project.Name + " - copy"
+	ctx.Project.Id = 0
+	ctx.Project.UserId = uint(ctx.User.Id)
 	now := time.Now()
-	c.Project.CreatedAt = now
-	c.Project.UpdatedAt = now
-	_, err := models.AddProject(c.Project)
+	ctx.Project.CreatedAt = now
+	ctx.Project.UpdatedAt = now
+	_, err := models.AddProject(ctx.Project)
 	if err != nil {
-		c.SetJson(1, nil, "复制失败")
+		return ctx.SetJson(1, nil, "复制失败")
 	}
-	c.SetJson(0, c.Project, "")
-	return
-
+	return ctx.SetJson(0, ctx.Project, "")
 }

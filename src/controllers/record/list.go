@@ -1,27 +1,21 @@
 package recordcontrollers
 
 import (
-	"github.com/astaxie/beego/orm"
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/common"
+	"github.com/linclin/gopub/src/library/db"
 )
 
-type ListController struct {
-	controllers.BaseController
-}
-
-func (c *ListController) Get() {
-	taskId := c.GetString("taskId")
-	var records []orm.Params
+func List(c echo.Context) error {
+	ctx := controllers.New(c)
+	taskId := ctx.GetString("taskId")
+	var records []db.Params
 	if common.GetInt(taskId) <= 0 {
-		timeNow := c.GetString("time")
-		o := orm.NewOrm()
-		o.Raw("SELECT * FROM `record` where task_id=? and created_at> ? ORDER BY `id` ASC ", taskId, timeNow).Values(&records)
+		timeNow := ctx.GetString("time")
+		records, _ = db.Values("SELECT * FROM `record` where task_id=? and created_at> ? ORDER BY `id` ASC ", taskId, timeNow)
 	} else {
-		o := orm.NewOrm()
-		o.Raw("SELECT * FROM `record` where task_id=? ORDER BY `id` ASC ", taskId).Values(&records)
+		records, _ = db.Values("SELECT * FROM `record` where task_id=? ORDER BY `id` ASC ", taskId)
 	}
-	c.SetJson(0, records, "")
-	return
-
+	return ctx.SetJson(0, records, "")
 }

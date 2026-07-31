@@ -1,143 +1,158 @@
 package main
 
 import (
-	"fmt"
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
-	"github.com/astaxie/beego/toolbox"
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/linclin/gopub/src/library/p2p/init_sever"
-	"github.com/linclin/gopub/src/models"
-	_ "github.com/linclin/gopub/src/routers"
+	"context"
+	"html/template"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/linclin/gopub/src/library/config"
+	"github.com/linclin/gopub/src/library/db"
+	"github.com/linclin/gopub/src/library/logger"
+	"github.com/linclin/gopub/src/library/p2p/init_sever"
+	"github.com/linclin/gopub/src/models"
+	"github.com/linclin/gopub/src/routers"
 )
 
 func initArgs() {
-	args := os.Args
-	for _, v := range args {
+	for _, v := range os.Args {
 		if v == "-syncdb" {
 			models.Syncdb()
 			os.Exit(0)
 		}
 		if v == "-docker" {
-			beego.BConfig.RunMode = "docker"
+			config.SetRunMode("docker")
 			models.Syncdb()
 		}
 	}
 }
 
-func init() {
-	//初始化数据库
-	initArgs()
-	beego.Info("开始启动")
-	//连接MySQL
-	dbUser := beego.AppConfig.String("mysqluser")
-	dbPass := beego.AppConfig.String("mysqlpass")
-	dbHost := beego.AppConfig.String("mysqlhost")
-	dbPort := beego.AppConfig.String("mysqlport")
-	dbName := beego.AppConfig.String("mysqldb")
-	if beego.BConfig.RunMode == "docker" {
-		if os.Getenv("MYSQL_USER") != "" {
-			dbUser = os.Getenv("MYSQL_USER")
-		}
-		if os.Getenv("MYSQL_PASS") != "" {
-			dbPass = os.Getenv("MYSQL_PASS")
-		}
-		if os.Getenv("MYSQL_HOST") != "" {
-			dbHost = os.Getenv("MYSQL_HOST")
-		}
-		if os.Getenv("MYSQL_PORT") != "" {
-			dbPort = os.Getenv("MYSQL_PORT")
-		}
-		if os.Getenv("MYSQL_DB") != "" {
-			dbName = os.Getenv("MYSQL_DB")
-		}
-		if os.Getenv("JenkinsUserName") != "" {
-			beego.AppConfig.Set("JenkinsUserName", os.Getenv("JenkinsUserName"))
-		}
-		if os.Getenv("JenkinsPwd") != "" {
-			beego.AppConfig.Set("JenkinsPwd", os.Getenv("JenkinsPwd"))
-		}
-	}
-
-	maxIdleConn, _ := beego.AppConfig.Int("mysql_max_idle_conn")
-	maxOpenConn, _ := beego.AppConfig.Int("mysql_max_open_conn")
-	dbLink := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", dbUser, dbPass, dbHost, dbPort, dbName) + "&loc=Asia%2FShanghai"
-	//utils.Display("dbLink", dbLink)
-	orm.RegisterDriver("mysql", orm.DRMySQL)
-	orm.RegisterDataBase("default", "mysql", dbLink, maxIdleConn, maxOpenConn)
-
-	if beego.BConfig.RunMode == "dev" {
-		orm.Debug = true
-	}
-	//设置日志:按天分割,保留30天,自动轮转
+// initLogger 设置日志:按天分割,保留30天,自动轮转
+func initLogger() {
 	fn := "logs/run.log"
 	os.MkdirAll("logs", 0755)
-	if _, err := os.Stat(fn); err != nil {
-		if os.IsNotExist(err) {
-			os.Create(fn)
-		}
+	if err := logger.SetFile(fn, 30); err != nil {
+		println("日志文件初始化失败: " + err.Error())
 	}
-	beego.SetLogger("file", `{"filename":"`+fn+`","daily":true,"maxdays":30,"rotate":true,"perm":"0644"}`)
-	if beego.BConfig.RunMode == "prod" {
-		beego.SetLevel(beego.LevelInformational)
+	if config.RunMode() == "prod" {
+		logger.SetLevel(logger.LevelInformational)
 	}
-
 }
 
-func handleSignals(c chan os.Signal) {
-	switch <-c {
-	case syscall.SIGINT, syscall.SIGTERM:
-
-		beego.Info("Shutdown quickly, bye...")
-	case syscall.SIGQUIT:
-		beego.Info("Shutdown gracefully, bye...")
-		// do graceful shutdown
+func init() {
+	initLogger()
+	logger.Info("开始启动")
+	//初始化数据库
+	initArgs()
+	//连接MySQL
+	if os.Getenv("JenkinsUserName") != "" {
+		config.Set("JenkinsUserName", os.Getenv("JenkinsUserName"))
 	}
-	os.Exit(0)
+	if os.Getenv("JenkinsPwd") != "" {
+		config.Set("JenkinsPwd", os.Getenv("JenkinsPwd"))
+	}
+	if err := db.InitFromConfig(); err != nil {
+		logger.Error("数据库连接错误:", err)
+		os.Exit(2)
+	}
+}
+
+// tplRenderer 渲染 views 目录下的模板，替代 beego 的模板自动渲染
+type tplRenderer struct {
+	templates *template.Template
+}
+
+func (t *tplRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	if t.templates == nil {
+		return echo.NewHTTPError(500, "模板未加载: "+name)
+	}
+	return t.templates.ExecuteTemplate(w, name, data)
+}
+
+func newRenderer() *tplRenderer {
+	tpl, err := template.ParseGlob("views/*.tpl")
+	if err != nil {
+		logger.Error("模板加载失败:", err)
+		return &tplRenderer{}
+	}
+	return &tplRenderer{templates: tpl}
 }
 
 func main() {
 	//获取全局panic
 	defer func() {
 		if err := recover(); err != nil {
-			beego.Error("Panic error:", err)
+			logger.Error("Panic error:", err)
 		}
 	}()
-	//热启动
-	graceful, _ := beego.AppConfig.Bool("Graceful")
-	if graceful {
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-		go handleSignals(sigs)
+
+	e := echo.New()
+	e.HideBanner = true
+	e.HidePort = true
+	e.Use(middleware.Recover())
+	if enableGzip, _ := config.Bool("EnableGzip"); enableGzip {
+		e.Use(middleware.Gzip())
 	}
+	if accessLogs, _ := config.Bool("AccessLogs"); accessLogs {
+		e.Use(middleware.Logger())
+	}
+	// 使 /path/ 与 /path 等价，对应 beego 命名空间路由的行为
+	e.Pre(middleware.RemoveTrailingSlash())
+
+	e.Renderer = newRenderer()
+	e.Static("/static", "static")
+	e.File("/favicon.ico", "favicon.ico")
+
 	//API自动化文档
-	if beego.BConfig.RunMode == "dev" {
-		beego.BConfig.WebConfig.DirectoryIndex = true
-		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
-
+	if config.RunMode() == "dev" {
+		e.Use(middleware.StaticWithConfig(middleware.StaticConfig{
+			Root:   "swagger",
+			Browse: true,
+		}))
 	}
 
-	if beego.BConfig.RunMode == "prod" {
-		//check_p2p_angent_status := toolbox.NewTask("check_p2p_angent_status", "0 0 0 * * 0", func() error {
-		//	err := tasks.Check_p2p_angent_status()
-		//	if err != nil {
-		//		beego.Error("定时任务: check_p2p_angent_status 发生错误:", err.Error())
-		//		return err
-		//	}
-		//	return nil
-		//})
-		//toolbox.AddTask("check_p2p_angent_status", check_p2p_angent_status)
-		defer toolbox.StopTask()
-	}
+	routers.Register(e)
 
-	toolbox.StartTask()
-
-	beego.Info(beego.BConfig.RunMode)
-	if beego.BConfig.RunMode != "docker" {
+	logger.Info(config.RunMode())
+	if config.RunMode() != "docker" {
 		init_sever.Start()
 	}
-	beego.Run()
+
+	addr := config.DefaultString("HttpAddr", "0.0.0.0") + ":" + config.DefaultString("httpport", "8080")
+	//热启动
+	graceful, _ := config.Bool("Graceful")
+	go handleSignals(e, graceful)
+
+	logger.Info("监听地址:", addr)
+	if err := e.Start(addr); err != nil {
+		logger.Info("Shutdown, bye...", err)
+	}
+}
+
+// handleSignals 处理退出信号；Graceful 开启时等待在途请求处理完毕
+func handleSignals(e *echo.Echo, graceful bool) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	sig := <-sigs
+
+	if !graceful {
+		logger.Info("Shutdown quickly, bye...", sig)
+		logger.Close()
+		os.Exit(0)
+	}
+
+	logger.Info("Shutdown gracefully, bye...", sig)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := e.Shutdown(ctx); err != nil {
+		logger.Error("优雅关闭失败:", err)
+	}
+	logger.Close()
+	os.Exit(0)
 }

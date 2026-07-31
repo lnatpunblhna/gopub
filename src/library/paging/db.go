@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
+	"github.com/linclin/gopub/src/library/db"
+	"github.com/linclin/gopub/src/library/logger"
 )
 
 /**
@@ -17,7 +17,7 @@ import (
  * 否则以schema中指定的默认排序方式为准；
  * 如果都未指定则不排序。
  */
-func GetListTable(db orm.Ormer, schema common.Info, columns []common.Info, conditions []common.Info, start int64, pageSize int64, orderby []string, isAsc []string) []orm.ParamsList {
+func GetListTable(schema common.Info, columns []common.Info, conditions []common.Info, start int64, pageSize int64, orderby []string, isAsc []string) []db.ParamsList {
 	// 用于存放columns或者conditions中可能存在的joinId
 	joinIds := map[string]string{}
 	sqlSelect := buildSelect(schema, columns, joinIds, false)
@@ -47,11 +47,10 @@ func GetListTable(db orm.Ormer, schema common.Info, columns []common.Info, condi
 	if pageSize != -1 {
 		sql += " limit " + strconv.Itoa(int(start)) + "," + strconv.Itoa(int(pageSize))
 	}
-	beego.Debug("GetListTable:", sql)
-	var list []orm.ParamsList
-	_, err := db.Raw(sql).ValuesList(&list)
+	logger.Debug("GetListTable:", sql)
+	list, err := db.ValuesList(sql)
 	if err != nil {
-		beego.Error(sql+"  获取失败:", err.Error())
+		logger.Error(sql+"  获取失败:", err.Error())
 	}
 	return list
 }
@@ -59,7 +58,7 @@ func GetListTable(db orm.Ormer, schema common.Info, columns []common.Info, condi
 /**
  * 返回结果集总记录数量
  */
-func GetCount(db orm.Ormer, schema common.Info, columns []common.Info, conditions []common.Info) int {
+func GetCount(schema common.Info, columns []common.Info, conditions []common.Info) int {
 	// 用于存放columns或者conditions中可能存在的joinId
 	joinIds := map[string]string{}
 	distinct := " "
@@ -80,11 +79,14 @@ func GetCount(db orm.Ormer, schema common.Info, columns []common.Info, condition
 		}
 	}
 	sql += ") as t"
-	beego.Debug("GetCount:", sql)
-	var count []orm.ParamsList
-	_, err := db.Raw(sql).ValuesList(&count)
+	logger.Debug("GetCount:", sql)
+	count, err := db.ValuesList(sql)
 	if err != nil {
-		beego.Error(sql+"  获取失败:", err.Error())
+		logger.Error(sql+"  获取失败:", err.Error())
+		return 0
+	}
+	if len(count) == 0 || len(count[0]) == 0 {
+		return 0
 	}
 	return common.GetInt(count[0][0])
 }

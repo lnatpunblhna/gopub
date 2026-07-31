@@ -1,42 +1,32 @@
 package confcontrollers
 
 import (
-	"github.com/astaxie/beego/orm"
+	"strings"
+
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/common"
-	"strings"
+	"github.com/linclin/gopub/src/library/db"
 )
 
-type TagsController struct {
-	controllers.BaseController
-}
-
-func (c *TagsController) Get() {
-	if c.User == nil || c.User.Id == 0 {
-		c.SetJson(2, nil, "not login")
-		return
+func Tags(c echo.Context) error {
+	ctx := controllers.New(c)
+	if ctx.User == nil || ctx.User.Id == 0 {
+		return ctx.SetJson(2, nil, "not login")
 	}
 
-	var rows []orm.Params
-	o := orm.NewOrm()
-	o.Raw("SELECT tag FROM `project`").Values(&rows)
+	rows, _ := db.Values("SELECT tag FROM `project`")
 
 	var a []string
-	if len(rows) > 0 {
-		for _, row := range rows {
-			tmp := strings.Split(common.GetString(row["tag"]), " ")
-			if len(tmp) > 0 {
-				for _, tag := range tmp {
-					if tag != "" {
-						a = append(a, tag)
-					}
-				}
+	for _, row := range rows {
+		tmp := strings.Split(common.GetString(row["tag"]), " ")
+		for _, tag := range tmp {
+			if tag != "" {
+				a = append(a, tag)
 			}
 		}
 	}
 
 	a = common.ArrayUnique(a)
-	c.SetJson(0, a, "")
-	return
-
+	return ctx.SetJson(0, a, "")
 }

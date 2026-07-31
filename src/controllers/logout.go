@@ -1,13 +1,11 @@
 package controllers
 
-import ()
+import (
+	"net/http"
 
-type LogoutController struct {
-	BaseController
-}
+	"github.com/labstack/echo/v4"
+)
 
-func (c *LogoutController) Post() {
-	c.Data["json"] = map[string]interface{}{"code": 0, "msg": "sucess"}
-	c.ServeJSON()
-	return
+func Logout(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]interface{}{"code": 0, "msg": "sucess"})
 }

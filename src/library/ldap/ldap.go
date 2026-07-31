@@ -2,8 +2,9 @@ package ldap
 
 import (
 	"fmt"
-	"github.com/astaxie/beego"
 	ldap "github.com/go-ldap/ldap/v3"
+	"github.com/linclin/gopub/src/library/config"
+	"github.com/linclin/gopub/src/library/logger"
 	"strings"
 )
 
@@ -19,13 +20,13 @@ type Ldap_user struct {
 }
 
 func (l *Ldap) Connect() (e error) {
-	ldapHost := beego.AppConfig.String("ldapHost")
-	ldapPort, _ := beego.AppConfig.Int("ldapPort")
-	beego.Debug(fmt.Sprintf("try to connect ldap: %s:%d", ldapHost, ldapPort))
+	ldapHost := config.String("ldapHost")
+	ldapPort, _ := config.Int("ldapPort")
+	logger.Debug(fmt.Sprintf("try to connect ldap: %s:%d", ldapHost, ldapPort))
 
 	link, e := ldap.Dial("tcp", fmt.Sprintf("%s:%d", ldapHost, ldapPort))
 	if e != nil {
-		beego.Info(e)
+		logger.Info(e)
 		return e
 	}
 
@@ -34,7 +35,7 @@ func (l *Ldap) Connect() (e error) {
 }
 
 func (l *Ldap) Search(baseDn string, query string) (rs *ldap.SearchResult, e error) {
-	beego.Debug("search:" + query)
+	logger.Debug("search:" + query)
 	searchRequest := ldap.NewSearchRequest(
 		baseDn, // The base dn to search
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
@@ -44,15 +45,15 @@ func (l *Ldap) Search(baseDn string, query string) (rs *ldap.SearchResult, e err
 	)
 	rs, e = l.link.Search(searchRequest)
 	if e != nil {
-		beego.Info(e)
+		logger.Info(e)
 	}
 	return rs, e
 }
 
 func (l *Ldap) SearchUser(uid string) (users []Ldap_user, e error) {
-	baseDn := beego.AppConfig.String("ldapPeopleDn")
+	baseDn := config.String("ldapPeopleDn")
 	query := fmt.Sprintf("(uid=%s)", uid)
-	beego.Debug("search user" + baseDn + query)
+	logger.Debug("search user" + baseDn + query)
 	rs, e := l.Search(baseDn, query)
 	if e == nil {
 		for _, entry := range rs.Entries {
@@ -74,13 +75,13 @@ func (l *Ldap) formatUser(entry *ldap.Entry) (user Ldap_user) {
 	return user
 }
 func (l *Ldap) AuthByUidAndPassword(uid string, password string) (user Ldap_user, e error) {
-	userDn := strings.Replace(beego.AppConfig.String("ldapPeopleDnTpl"), "{uid}", uid, -1)
-	beego.Debug("auth user: " + userDn)
+	userDn := strings.Replace(config.String("ldapPeopleDnTpl"), "{uid}", uid, -1)
+	logger.Debug("auth user: " + userDn)
 	e = l.link.Bind(userDn, password)
 
 	if e == nil {
-		beego.Debug("ldap auth succ")
-		baseDn := beego.AppConfig.String("ldapPeopleDn")
+		logger.Debug("ldap auth succ")
+		baseDn := config.String("ldapPeopleDn")
 		userEntry, e := l.Search(baseDn, fmt.Sprintf("(uid=%s)", uid))
 		if e != nil {
 			return user, e
@@ -94,13 +95,13 @@ func (l *Ldap) AuthByUidAndPassword(uid string, password string) (user Ldap_user
 }
 func (l *Ldap) SearchGroupCn(query string) (cn string, e error) {
 
-	baseDn := beego.AppConfig.String("ldapGroupDn")
+	baseDn := config.String("ldapGroupDn")
 	rs, e := l.Search(baseDn, query)
 	if e == nil {
 		if len(rs.Entries) > 0 {
 			return rs.Entries[0].GetAttributeValue("cn"), nil
 		} else {
-			beego.Info("user is not in cronsun group " + query)
+			logger.Info("user is not in cronsun group " + query)
 			return "", fmt.Errorf("user is not in cronsun group")
 		}
 	} else {

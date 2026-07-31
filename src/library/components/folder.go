@@ -3,8 +3,9 @@ package components
 import ()
 import (
 	"fmt"
-	"github.com/astaxie/beego"
 	"github.com/linclin/gopub/src/library/common"
+	"github.com/linclin/gopub/src/library/config"
+	"github.com/linclin/gopub/src/library/logger"
 	"github.com/linclin/gopub/src/library/p2p/init_sever"
 	"github.com/linclin/gopub/src/models"
 	"strings"
@@ -54,7 +55,7 @@ func (c *BaseComponents) CopyFiles() error {
 	} else {
 		_, err := c.copyFilesBySftp(src, dest, []string{})
 		if err != nil {
-			beego.Info(err)
+			logger.Info(err)
 			return err
 		}
 	}
@@ -106,7 +107,7 @@ func (c *BaseComponents) unpackageFiles() error {
 	cmds := []string{}
 	cmds = append(cmds, fmt.Sprintf("cd %s ", releasePath))
 	//兼容docker
-	if beego.BConfig.RunMode == "docker" {
+	if config.RunMode() == "docker" {
 		cmds = append(cmds, fmt.Sprintf("tar %s %s -C %s", unTarparameter, releasePackage, releasePath))
 	} else {
 		cmds = append(cmds, fmt.Sprintf("tar --preserve-permissions --touch --no-same-owner %s %s -C %s", unTarparameter, releasePackage, releasePath))
@@ -127,10 +128,10 @@ func (c *BaseComponents) packageFiles() error {
 		tarparameter = "-cf"
 	}
 	cmds := []string{}
-	beego.Info(strings.TrimRight(c.getDeployWorkspace(version), "/"))
+	logger.Info(strings.TrimRight(c.getDeployWorkspace(version), "/"))
 	cmds = append(cmds, fmt.Sprintf("cd %s", strings.TrimRight(c.getDeployWorkspace(version), "/")))
 	commandFiles := "."
-	if beego.BConfig.RunMode == "docker" {
+	if config.RunMode() == "docker" {
 		cmds = append(cmds, fmt.Sprintf("tar %s  %s %s %s", c.excludes(version), tarparameter, packagePath, commandFiles))
 
 	} else {

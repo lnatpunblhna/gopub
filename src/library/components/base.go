@@ -3,10 +3,11 @@ package components
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/astaxie/beego"
 	"github.com/cucued/sshexec"
 	"github.com/linclin/gopub/src/library/common"
+	"github.com/linclin/gopub/src/library/config"
 	"github.com/linclin/gopub/src/library/jumpserver"
+	"github.com/linclin/gopub/src/library/logger"
 	"github.com/linclin/gopub/src/library/ssh"
 	"github.com/linclin/gopub/src/models"
 	"regexp"
@@ -70,11 +71,11 @@ func (c *BaseComponents) runRemoteCommand(command string, hosts []string) ([]ssh
 	sshExecAgent.Worker = SSHWorker
 	sshExecAgent.TimeOut = time.Duration(SSHREMOTETIMEOUT) * time.Second
 	sshExecAgent.Algorithm = gopubssh.SSHAlgorithm(c.project.SshAlgorithm)
-	port, _ := beego.AppConfig.Int("SshPort")
-	beego.Info(hosts)
-	beego.Info(port)
+	port, _ := config.Int("SshPort")
+	logger.Info(hosts)
+	logger.Info(port)
 	s, err := sshExecAgent.SshHostByKey(hosts, port, c.project.ReleaseUser, command)
-	beego.Info(err)
+	logger.Info(err)
 	ss, _ := json.Marshal(s)
 	go c.LogTaskCommond(string(ss))
 	//获取执行时间
@@ -106,7 +107,7 @@ func (c *BaseComponents) copyFilesBySftp(src string, dest string, hosts []string
 	sshExecAgent.Worker = SSHWorker
 	sshExecAgent.TimeOut = time.Duration(SSHREMOTETIMEOUT) * time.Second
 	sshExecAgent.Algorithm = gopubssh.SSHAlgorithm(c.project.SshAlgorithm)
-	port, _ := beego.AppConfig.Int("SshPort")
+	port, _ := config.Int("SshPort")
 	s, err := sshExecAgent.SftpHostByKey(hosts, port, c.project.ReleaseUser, src, dest)
 	ss, _ := json.Marshal(s)
 	go c.LogTaskCommond(string(ss))
@@ -157,7 +158,7 @@ type HostInfo struct {
 }
 
 func (c *BaseComponents) GetHosts() []HostInfo {
-	enableJumpserver, _ := beego.AppConfig.Bool("enableJumpserver")
+	enableJumpserver, _ := config.Bool("enableJumpserver")
 	if enableJumpserver == true {
 		return c.GetHosts_jumpserver()
 	} else {
@@ -268,7 +269,7 @@ func (c *BaseComponents) GetAllHost() []string {
 func (c *BaseComponents) GetGroupHost() map[int]string {
 	hosts := map[int]string{}
 	hostsInfo := c.GetHosts()
-	beego.Info(hostsInfo)
+	logger.Info(hostsInfo)
 	for _, info := range hostsInfo {
 		hosts[info.Group] = info.Ip + ":" + common.GetString(info.Port) + "\r\n"
 	}
@@ -386,18 +387,18 @@ func (c *BaseComponents) SaveRecord(command string) int {
 	re.Status = 1
 	id, err := models.AddRecord(&re)
 	if err != nil {
-		beego.Error(err)
+		logger.Error(err)
 	}
 	return int(id)
 }
 func (c *BaseComponents) SaveRecordRes(id int, duration int, createdAt int, status int, value interface{}) {
-	beego.Info(value)
+	logger.Info(value)
 	if duration < 0 {
 		duration = 0
 	}
 	re, err := models.GetRecordById(id)
 	if err != nil {
-		beego.Error(err)
+		logger.Error(err)
 		return
 	}
 	re.Duration = duration
@@ -407,7 +408,7 @@ func (c *BaseComponents) SaveRecordRes(id int, duration int, createdAt int, stat
 	re.Status = int16(status)
 	err = models.UpdateRecordById(re)
 	if err != nil {
-		beego.Error(err)
+		logger.Error(err)
 	}
 }
 

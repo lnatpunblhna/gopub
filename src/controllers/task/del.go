@@ -1,21 +1,17 @@
 package taskcontrollers
 
 import (
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/models"
 )
 
-type DelController struct {
-	controllers.BaseController
-}
-
-func (c *DelController) Get() {
-	taskId, _ := c.GetInt("taskId", 0)
+func Del(c echo.Context) error {
+	ctx := controllers.New(c)
+	taskId, _ := ctx.GetInt("taskId", 0)
 	err := models.DeleteTask(taskId)
 	if err != nil {
-		c.SetJson(1, nil, err.Error())
-		return
+		return ctx.SetJson(1, nil, err.Error())
 	}
-	c.SetJson(0, nil, "删除成功")
-	return
+	return ctx.SetJson(0, nil, "删除成功")
 }

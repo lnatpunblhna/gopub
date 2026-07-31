@@ -2,27 +2,25 @@ package controllers
 
 import (
 	"encoding/json"
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/orm"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/models"
+	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/labstack/echo/v4"
+	"github.com/linclin/gopub/src/library/common"
+	"github.com/linclin/gopub/src/library/config"
+	"github.com/linclin/gopub/src/library/db"
+	"github.com/linclin/gopub/src/models"
 )
 
-type LoginByDockerController struct {
-	BaseController
-}
-
-func (c *LoginByDockerController) Get() {
-	if beego.BConfig.RunMode != "docker" {
-		c.StopRun()
-		return
+func LoginByDocker(c echo.Context) error {
+	ctx := New(c)
+	if config.RunMode() != "docker" {
+		return nil
 	}
-	jumpUrl := c.GetString("jumpurl")
+	jumpUrl := ctx.GetString("jumpurl")
 	var user models.User
-	o := orm.NewOrm()
-	err := o.Raw("SELECT * FROM `user` WHERE username= ?", "admin").QueryRow(&user)
+	err := db.QueryRow(&user, "SELECT * FROM `user` WHERE username= ?", "admin")
 
 	if err == nil && user.AuthKey == "" {
 		userAuth := common.Md5String(user.Username + common.GetString(time.Now().Unix()))
@@ -30,8 +28,12 @@ func (c *LoginByDockerController) Get() {
 		models.UpdateUserById(&user)
 	}
 	resUserInfo := map[string]interface{}{"user": user, "login": true}
-	userInfoJson, err := json.Marshal(resUserInfo)
-	c.Ctx.SetCookie("gopub_userinfo", url.QueryEscape(string(userInfoJson)), 3600*24*2, "/")
-	c.Redirect(jumpUrl, 302)
-	c.StopRun()
+	userInfoJson, _ := json.Marshal(resUserInfo)
+	ctx.SetCookie(&http.Cookie{
+		Name:   "gopub_userinfo",
+		Value:  url.QueryEscape(string(userInfoJson)),
+		MaxAge: 3600 * 24 * 2,
+		Path:   "/",
+	})
+	return ctx.Redirect(http.StatusFound, jumpUrl)
 }

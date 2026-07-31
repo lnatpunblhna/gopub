@@ -1,71 +1,74 @@
 package wallecontrollers
 
 import (
-	"github.com/astaxie/beego/orm"
+	"time"
+
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/library/common"
 	"github.com/linclin/gopub/src/library/components"
+	"github.com/linclin/gopub/src/library/db"
 	"github.com/linclin/gopub/src/models"
-	"strings"
-	"time"
 )
 
-type ReleaseController struct {
-	controllers.BaseController
+// releaseJob 承载一次上线/回滚任务所需的数据。
+//
+// 上线流程在独立 goroutine 中执行，而 Echo 会复用 echo.Context 对象，
+// 请求结束后继续持有它会读到其他请求的数据，因此这里只保留 Task/Project，
+// 不引用请求上下文。
+type releaseJob struct {
+	Task    *models.Task
+	Project *models.Project
 }
 
-func (c *ReleaseController) Get() {
-	if c.Task == nil || c.Task.Id == 0 {
-		c.SetJson(1, nil, "Parameter error")
-		return
+func Release(c echo.Context) error {
+	ctx := controllers.New(c)
+	if ctx.Task == nil || ctx.Task.Id == 0 {
+		return ctx.SetJson(1, nil, "Parameter error")
 	}
-	c.Project, _ = models.GetProjectById(c.Task.ProjectId)
-	if c.Project == nil || c.Project.Id == 0 {
-		c.SetJson(1, nil, "Parameter error")
-		return
+	project, _ := models.GetProjectById(ctx.Task.ProjectId)
+	if project == nil || project.Id == 0 {
+		return ctx.SetJson(1, nil, "Parameter error")
 	}
-	if c.User == nil || c.User.Id == 0 {
-		c.SetJson(2, nil, "not login")
-		return
+	ctx.Project = project
+	if ctx.User == nil || ctx.User.Id == 0 {
+		return ctx.SetJson(2, nil, "not login")
 	}
 	//不是自己的项目不允许上线(除非是管理员项目)
-	if c.User.Id != int(c.Task.UserId) && c.User.Id != 1 && c.Task.UserId != 1 {
-		c.SetJson(1, nil, "not such uer")
-		return
+	if ctx.User.Id != int(ctx.Task.UserId) && ctx.User.Id != 1 && ctx.Task.UserId != 1 {
+		return ctx.SetJson(1, nil, "not such uer")
 	}
 	//上线成功 以及审核失败不允许上线
-	if c.Task.Status == 2 || c.Task.Status == 3 {
-		c.SetJson(1, nil, "此项目已完成")
-		return
+	if ctx.Task.Status == 2 || ctx.Task.Status == 3 {
+		return ctx.SetJson(1, nil, "此项目已完成")
 	}
 	//正在上线的不允许上线
-	if c.Task.IsRun == 1 {
-		c.SetJson(1, nil, "此项目正在上线中")
-		return
+	if ctx.Task.IsRun == 1 {
+		return ctx.SetJson(1, nil, "此项目正在上线中")
 	}
 	//删除上线日志记录
-	o := orm.NewOrm()
-	o.Raw("DELETE FROM `record` WHERE `task_id`= ? ", c.Task.Id).Exec()
-	if c.Task.Action == 0 {
+	db.Exec("DELETE FROM `record` WHERE `task_id`= ? ", ctx.Task.Id)
+
+	job := &releaseJob{Task: ctx.Task, Project: project}
+	if job.Task.Action == 0 {
 		//生成版本号
-		c.makeVersion()
+		job.makeVersion()
 		go func() {
-			err := c.releaseHandling()
+			err := job.releaseHandling()
 			if err != nil {
 				models.AddTaskErrLog(&models.TaskErrLog{
 					ErrInfo: err.Error(),
-					TaskId:  c.Task.Id,
+					TaskId:  job.Task.Id,
 				})
 			}
 		}()
 	} else {
-		go c.rollBackHandling()
+		go job.rollBackHandling()
 	}
-	c.SetJson(0, nil, "")
-	return
-
+	return ctx.SetJson(0, nil, "")
 }
-func (c *ReleaseController) makeVersion() {
+
+func (c *releaseJob) makeVersion() {
 	c.Task.IsRun = 1
 	version := time.Now().Format("20060102-150405")
 	c.Task.LinkId = version
@@ -74,7 +77,7 @@ func (c *ReleaseController) makeVersion() {
 }
 
 // 回滚任务
-func (c *ReleaseController) rollBackHandling() error {
+func (c *releaseJob) rollBackHandling() error {
 	s := components.BaseComponents{}
 	s.SetProject(c.Project)
 	s.SetTask(c.Task)
@@ -93,9 +96,8 @@ func (c *ReleaseController) rollBackHandling() error {
 }
 
 // 普通上线任务
-func (c *ReleaseController) updateRecord(action int) error {
-	o := orm.NewOrm()
-	_, err := o.Raw("UPDATE `record` SET `action`= ?  WHERE`task_id` = ? and action=0", action, c.Task.Id).Exec()
+func (c *releaseJob) updateRecord(action int) error {
+	_, err := db.Exec("UPDATE `record` SET `action`= ?  WHERE`task_id` = ? and action=0", action, c.Task.Id)
 	if err != nil {
 		return err
 	}
@@ -103,7 +105,7 @@ func (c *ReleaseController) updateRecord(action int) error {
 }
 
 // 普通上线任务
-func (c *ReleaseController) releaseHandling() error {
+func (c *releaseJob) releaseHandling() error {
 	s := components.BaseComponents{}
 	s.SetProject(c.Project)
 	s.SetTask(c.Task)
@@ -186,7 +188,7 @@ func (c *ReleaseController) releaseHandling() error {
 
 }
 
-func (c *ReleaseController) changeReleaseData() error {
+func (c *releaseJob) changeReleaseData() error {
 	//对于回滚的任务不记录线上版本
 	if c.Task.Action == 0 {
 		c.Task.ExLinkId = c.Project.Version
@@ -215,42 +217,39 @@ func (c *ReleaseController) changeReleaseData() error {
 	return nil
 }
 
-func (c *ReleaseController) enableRollBack() error {
-	var ids []orm.Params
-	o := orm.NewOrm()
-	s, err := o.Raw("SELECT id FROM task WHERE `status`=3 and project_id = ? and  `enable_rollback`=1 ORDER BY id DESC LIMIT ?", c.Task.ProjectId, c.Project.KeepVersionNum).Values(&ids)
-	if s > 0 && err == nil {
-		idStrs := []string{}
-		for _, id := range ids {
-			idstr := common.GetString(id["id"])
-			idStrs = append(idStrs, idstr)
-		}
-		sqlIn := strings.Join(idStrs, ",")
-		var versionsRes []orm.Params
-		s1, err := o.Raw("SELECT link_id FROM task WHERE `enable_rollback`=1 and `id` not in ("+sqlIn+") and  project_id = ? ", c.Task.ProjectId).Values(&versionsRes)
-		if s1 > 0 && err == nil {
-			var versions []string
-			for _, version := range versionsRes {
-				versions = append(versions, common.GetString(version["link_id"]))
-			}
-			//这里查找需要设置不可回滚的版本 进行清除操作
-			s := components.BaseComponents{}
-			s.SetProject(c.Project)
-			s.SetTask(c.Task)
-			s.CleanUpReleasesVersion(versions)
-		}
-		_, err = o.Raw("UPDATE `task` SET `enable_rollback`='0' WHERE`id` not in ("+sqlIn+") and  project_id = ? and  `enable_rollback`=1 ", c.Task.ProjectId).Exec()
-		if err != nil {
-			return err
-		}
-		return nil
-	} else {
+func (c *releaseJob) enableRollBack() error {
+	ids, err := db.Values("SELECT id FROM task WHERE `status`=3 and project_id = ? and  `enable_rollback`=1 ORDER BY id DESC LIMIT ?", c.Task.ProjectId, c.Project.KeepVersionNum)
+	if err != nil {
 		return err
 	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	// 保留的版本 id 集合，改用占位符传入避免拼接 SQL
+	keepIds := []interface{}{}
+	for _, id := range ids {
+		keepIds = append(keepIds, common.GetString(id["id"]))
+	}
+
+	versionsRes, err := db.Values("SELECT link_id FROM task WHERE `enable_rollback`=1 and `id` not in (?) and  project_id = ? ", keepIds, c.Task.ProjectId)
+	if err == nil && len(versionsRes) > 0 {
+		var versions []string
+		for _, version := range versionsRes {
+			versions = append(versions, common.GetString(version["link_id"]))
+		}
+		//这里查找需要设置不可回滚的版本 进行清除操作
+		s := components.BaseComponents{}
+		s.SetProject(c.Project)
+		s.SetTask(c.Task)
+		s.CleanUpReleasesVersion(versions)
+	}
+	_, err = db.Exec("UPDATE `task` SET `enable_rollback`='0' WHERE`id` not in (?) and  project_id = ? and  `enable_rollback`=1 ", keepIds, c.Task.ProjectId)
+	return err
 }
 
 // 上线失败处理
-func (c *ReleaseController) failHandling(co *components.BaseComponents) {
+func (c *releaseJob) failHandling(co *components.BaseComponents) {
 	//修改状态
 	c.Task.Status = 4
 	c.Task.IsRun = 0
@@ -258,5 +257,4 @@ func (c *ReleaseController) failHandling(co *components.BaseComponents) {
 	models.UpdateTaskById(c.Task)
 	//清理本地版本库
 	co.CleanUpLocal(c.Task.LinkId)
-
 }

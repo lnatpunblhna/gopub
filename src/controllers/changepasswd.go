@@ -1,65 +1,53 @@
 package controllers
 
 import (
-	"github.com/astaxie/beego"
-
 	"encoding/json"
-	"github.com/astaxie/beego/orm"
+
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/library/common"
+	"github.com/linclin/gopub/src/library/db"
+	"github.com/linclin/gopub/src/library/logger"
 	"github.com/linclin/gopub/src/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type ChangePasswdController struct {
-	BaseController
-}
-
-func (c *ChangePasswdController) Post() {
+func ChangePasswd(c echo.Context) error {
+	ctx := New(c)
 	//哈希校验成功后 更新 auth_key
-	if c.User == nil || c.User.Id == 0 {
-		c.SetJson(2, nil, "not login")
-		return
+	if ctx.User == nil || ctx.User.Id == 0 {
+		return ctx.SetJson(2, nil, "not login")
 	}
 
-	beego.Info(string(c.Ctx.Input.RequestBody))
+	logger.Info(string(ctx.RequestBody()))
 
 	postData := map[string]string{"newpassword": "", "repeat_newpassword": ""}
-	err := json.Unmarshal(c.Ctx.Input.RequestBody, &postData)
+	err := json.Unmarshal(ctx.RequestBody(), &postData)
 	if err != nil {
-		c.SetJson(1, nil, "数据格式错误")
-		return
+		return ctx.SetJson(1, nil, "数据格式错误")
 	}
 
 	uid := postData["uid"]
-	if common.GetString(c.User.Id) != uid && c.User.Role != 1 {
-		c.SetJson(1, nil, "403")
-		return
+	if common.GetString(ctx.User.Id) != uid && ctx.User.Role != 1 {
+		return ctx.SetJson(1, nil, "403")
 	}
 	newPassword := postData["newpassword"]
 	repeatNewpassword := postData["repeat_newpassword"]
 	if newPassword == "" || repeatNewpassword == "" {
-		c.SetJson(1, nil, "请输入密码")
-		return
+		return ctx.SetJson(1, nil, "请输入密码")
 	}
 	var user models.User
-	o := orm.NewOrm()
-	err = o.Raw("SELECT * FROM `user` WHERE id= ?", uid).QueryRow(&user)
-	beego.Info(err)
+	err = db.QueryRow(&user, "SELECT * FROM `user` WHERE id= ?", uid)
+	logger.Info(err)
 	//验证旧密码
 
-	if newPassword == repeatNewpassword {
-		password := []byte(newPassword)
-		hashedPassword, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
-		if err != nil {
-			panic(err)
-		}
-		user.PasswordHash = string(hashedPassword)
-		models.UpdateUserById(&user)
-		c.Data["json"] = map[string]interface{}{"code": 0, "msg": "sucess"}
-		c.ServeJSON()
-		return
-	} else {
-		c.SetJson(1, nil, "两次密码输入不一致，请重新输入")
-		return
+	if newPassword != repeatNewpassword {
+		return ctx.SetJson(1, nil, "两次密码输入不一致，请重新输入")
 	}
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		panic(err)
+	}
+	user.PasswordHash = string(hashedPassword)
+	models.UpdateUserById(&user)
+	return ctx.Json(map[string]interface{}{"code": 0, "msg": "sucess"})
 }

@@ -1,32 +1,22 @@
 package usercontrollers
 
 import (
-	"github.com/astaxie/beego/orm"
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
+	"github.com/linclin/gopub/src/library/db"
 )
 
-type UserController struct {
-	controllers.BaseController
-}
-
-func (c *UserController) Get() {
-	userId, _ := c.GetInt("id")
+func User(c echo.Context) error {
+	ctx := controllers.New(c)
+	userId, _ := ctx.GetInt("id")
 	if userId == 0 {
-		o := orm.NewOrm()
-		var users []orm.Params
-		o.Raw("SELECT * FROM `user` ").Values(&users)
-		c.SetJson(0, users, "")
-		return
-	} else {
-		o := orm.NewOrm()
-		var users []orm.Params
-		var res orm.Params
-		i, err := o.Raw("SELECT * FROM `user` where id = ? ", userId).Values(&users)
-		if err == nil && i > 0 {
-			res = users[0]
-		}
-		c.SetJson(0, res, "")
-		return
+		users, _ := db.Values("SELECT * FROM `user` ")
+		return ctx.SetJson(0, users, "")
 	}
-
+	var res db.Params
+	users, err := db.Values("SELECT * FROM `user` where id = ? ", userId)
+	if err == nil && len(users) > 0 {
+		res = users[0]
+	}
+	return ctx.SetJson(0, res, "")
 }

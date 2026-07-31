@@ -1,21 +1,17 @@
 package confcontrollers
 
 import (
+	"github.com/labstack/echo/v4"
 	"github.com/linclin/gopub/src/controllers"
 	"github.com/linclin/gopub/src/models"
 )
 
-type DelController struct {
-	controllers.BaseController
-}
-
-func (c *DelController) Get() {
-	projectId, _ := c.GetInt("projectId", 0)
+func Del(c echo.Context) error {
+	ctx := controllers.New(c)
+	projectId, _ := ctx.GetInt("projectId", 0)
 	err := models.DeleteProject(projectId)
 	if err != nil {
-		c.SetJson(1, nil, err.Error())
-		return
+		return ctx.SetJson(1, nil, err.Error())
 	}
-	c.SetJson(0, nil, "删除成功")
-	return
+	return ctx.SetJson(0, nil, "删除成功")
 }
