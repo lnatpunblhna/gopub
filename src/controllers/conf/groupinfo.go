@@ -4,10 +4,10 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/jumpserver"
-	"github.com/linclin/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/jumpserver"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 )
 
 func GroupInfo(c echo.Context) error {
@@ -27,7 +27,11 @@ func GroupInfo(c echo.Context) error {
 	mGroupid2true := make(map[string]bool)
 	var rsIps []string
 	for _, gid := range aGroupid {
-		aIp, _ := jumpserver.GetIpsByGroupid(gid)
+		aIp, err := jumpserver.GetIpsByGroupid(gid)
+		if err != nil {
+			logger.Error("获取 jumpserver 节点", gid, "的资产失败:", err)
+			return ctx.SetJson(1, nil, "获取分组信息失败："+err.Error())
+		}
 		logger.Info(aIp)
 		mGroupid2true[gid] = true
 		for ip := range aIp {
@@ -37,7 +41,11 @@ func GroupInfo(c echo.Context) error {
 	rsIps = common.ArrayUnique(rsIps)
 
 	rsId2Groupname := make(map[string]string)
-	group2id, _ := jumpserver.GetGroups()
+	group2id, err := jumpserver.GetGroups()
+	if err != nil {
+		logger.Error("获取 jumpserver 服务器分组失败:", err)
+		return ctx.SetJson(1, nil, "获取分组信息失败："+err.Error())
+	}
 	for group_id, groupname := range group2id {
 		if _, ok := mGroupid2true[group_id]; ok {
 			rsId2Groupname[group_id] = groupname

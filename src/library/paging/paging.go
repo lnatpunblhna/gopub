@@ -2,10 +2,10 @@ package paging
 
 import (
 	"encoding/json"
-	"github.com/linclin/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/common"
 	"strings"
 
-	"github.com/linclin/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/db"
 )
 
 /**

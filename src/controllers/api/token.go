@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 // IssueToken 生成访问 Token（Json Web Token）
@@ -44,11 +44,12 @@ func IssueToken(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"errcode": "100", "errmsg": clientip + " 请求IP不在允许范围内  "})
 	}
 	// Create a Token that will be signed with HS256.
-	exptime := time.Now().Unix() + 3600
-	token := jwt.New(jwt.SigningMethodHS256)
-	claims, _ := token.Claims.(jwt.MapClaims)
-	claims["iss"] = appid   //The issuer of the token，token 是给谁的
-	claims["exp"] = exptime //Expiration Time。 token 过期时间，Unix 时间戳格式
+	expat := time.Now().Add(time.Hour)
+	exptime := expat.Unix()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"iss": appid,                     //The issuer of the token，token 是给谁的
+		"exp": jwt.NewNumericDate(expat), //Expiration Time。 token 过期时间，Unix 时间戳格式
+	})
 	// The claims object allows you to store information in the actual token.
 	tokenString, err := token.SignedString([]byte(config.String("SecretKey")))
 	// tokenString Contains the actual token you should share with your client.

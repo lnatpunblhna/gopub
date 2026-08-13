@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	log "github.com/cihub/seelog"
 	"github.com/julienschmidt/httprouter"
-	"github.com/linclin/gopub/src/library/p2p/p2p"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/p2p"
 	nettool "github.com/toolkits/net"
 	"io/ioutil"
 	"net/http"

@@ -101,17 +101,8 @@ function run() {
    ./$BASENAME    
    #go run main.go 
 }
-function beerun() {
-   cd src/
-   bee run 
-}
-
 function tailf() {
    tail -f $logfile
-}
-function docs() {
-   cd src/ 
-   bee generate docs 
 }
 
 function sslkey() {
@@ -124,7 +115,7 @@ function sslkey() {
 
  
 function help() {
-    echo "$0 build|start|stop|kill|restart|reload|run|tail|docs|pack|beerun|sslkey"
+    echo "$0 build|pack|start|stop|kill|restart|reload|status|run|tail|sslkey"
 }
 if [ "$1" == "" ]; then
     help
@@ -146,12 +137,8 @@ elif [ "$1" == "status" ];then
     status
 elif [ "$1" == "run" ];then
     run 
-elif [ "$1" == "beerun" ];then
-    beerun 
 elif [ "$1" == "tail" ];then
     tailf
-elif [ "$1" == "docs" ];then
-    docs 
 elif [ "$1" == "sslkey" ];then
     sslkey
 else

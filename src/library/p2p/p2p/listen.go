@@ -8,7 +8,7 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
-	"github.com/linclin/gopub/src/library/p2p/common"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/common"
 )
 
 // PeerConn wraps an incoming network connection and contains metadata that helps

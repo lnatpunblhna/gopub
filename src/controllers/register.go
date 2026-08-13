@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -80,7 +80,6 @@ func Register(c echo.Context) error {
 
 	//不存在，存库
 	var newuser models.User
-	userAuth := common.Md5String(registerUsername + common.GetString(time.Now().Unix()))
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("123456"), bcrypt.DefaultCost)
 	if err != nil {
 		panic(err)
@@ -93,7 +92,8 @@ func Register(c echo.Context) error {
 	newuser.Status = 10
 	newuser.CreatedAt = time.Now()
 	newuser.UpdatedAt = time.Now()
-	newuser.AuthKey = userAuth
+	// 不预置 auth_key：新账号还没登录过，预置一个可枚举的值没有用处
+	// 且容易被误当成有效凭据。留空，由首次登录时 models.IssueAuthKey 签发。
 	newuser.Email = registerEmail
 	newuser.Realname = registerRealname
 

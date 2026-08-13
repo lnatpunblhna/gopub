@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/linclin/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/db"
 )
 
 // AllModels 汇总全部数据模型，替代 beego 的 orm.RegisterModel 注册机制，

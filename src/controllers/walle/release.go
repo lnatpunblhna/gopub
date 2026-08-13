@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 // releaseJob 承载一次上线/回滚任务所需的数据。
@@ -19,6 +20,8 @@ import (
 type releaseJob struct {
 	Task    *models.Task
 	Project *models.Project
+	// Attempt 是这次发布在该上线单下的批次号，用于把多次发布的日志分开保存
+	Attempt int
 }
 
 func Release(c echo.Context) error {
@@ -46,26 +49,58 @@ func Release(c echo.Context) error {
 	if ctx.Task.IsRun == 1 {
 		return ctx.SetJson(1, nil, "此项目正在上线中")
 	}
-	//删除上线日志记录
-	db.Exec("DELETE FROM `record` WHERE `task_id`= ? ", ctx.Task.Id)
-
-	job := &releaseJob{Task: ctx.Task, Project: project}
+	// 这里原先是 DELETE 掉该任务的全部记录再重新发布，
+	// 上一次为什么失败连同日志一起没了；改为开一个新批次，历史留着可查
+	job := &releaseJob{
+		Task:    ctx.Task,
+		Project: project,
+		Attempt: models.NextAttempt(int64(ctx.Task.Id)),
+	}
 	if job.Task.Action == 0 {
 		//生成版本号
 		job.makeVersion()
 		go func() {
-			err := job.releaseHandling()
-			if err != nil {
-				models.AddTaskErrLog(&models.TaskErrLog{
-					ErrInfo: err.Error(),
-					TaskId:  job.Task.Id,
-				})
+			if err := job.releaseHandling(); err != nil {
+				job.logErr(err)
 			}
 		}()
 	} else {
-		go job.rollBackHandling()
+		// 回滚原先是裸 go 调用，返回的 error 直接被丢掉，
+		// 失败时既没有日志也没有记录，只能靠猜
+		go func() {
+			if err := job.rollBackHandling(); err != nil {
+				job.logErr(err)
+			}
+		}()
 	}
-	return ctx.SetJson(0, nil, "")
+	// 把本次批次号回给前端：日志页据此直接跟踪这一轮，
+	// 不用再去猜「最新批次」，避开记录还没落库时的竞态
+	return ctx.SetJson(0, map[string]interface{}{"attempt": job.Attempt}, "")
+}
+
+// logErr 把流程级错误同时写进日志与 task_err_log
+func (c *releaseJob) logErr(err error) {
+	logger.Error("上线任务失败 taskId=", c.Task.Id, " ", err)
+	if _, e := models.AddTaskErrLog(&models.TaskErrLog{
+		ErrInfo: err.Error(),
+		TaskId:  c.Task.Id,
+	}); e != nil {
+		logger.Error("写入 task_err_log 失败:", e)
+	}
+}
+
+// newComponents 构造带好归属信息的执行组件
+func (c *releaseJob) newComponents() components.BaseComponents {
+	s := components.BaseComponents{}
+	s.SetProject(c.Project)
+	s.SetTask(c.Task)
+	s.SetAttempt(c.Attempt)
+	if c.Task.Action == 0 {
+		s.SetScope(models.RecordScopeRelease)
+	} else {
+		s.SetScope(models.RecordScopeRollback)
+	}
+	return s
 }
 
 func (c *releaseJob) makeVersion() {
@@ -78,114 +113,83 @@ func (c *releaseJob) makeVersion() {
 
 // 回滚任务
 func (c *releaseJob) rollBackHandling() error {
-	s := components.BaseComponents{}
-	s.SetProject(c.Project)
-	s.SetTask(c.Task)
-	g := components.BaseGit{}
-	g.SetBaseComponents(s)
+	s := c.newComponents()
 	err := s.UpdateRemoteServers(c.Task.LinkId)
 	if err != nil {
-		c.failHandling(&s)
+		c.failHandling(&s, "回滚目标机版本", err)
 		return err
 	}
 	err = c.changeReleaseData()
 	if err != nil {
+		c.failHandling(&s, "更新回滚结果", err)
 		return err
 	}
+	s.AddFinalRecord(true, "", nil)
 	return nil
 }
 
 // 普通上线任务
-func (c *releaseJob) updateRecord(action int) error {
-	_, err := db.Exec("UPDATE `record` SET `action`= ?  WHERE`task_id` = ? and action=0", action, c.Task.Id)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// 普通上线任务
+//
+// 两处与旧实现的差别：
+//  1. 先判错再推进。旧实现是 updateRecord 在 if err != nil 之前调用，
+//     失败的那一步也会被标成已完成，步骤条照样往前走，看不出卡在哪。
+//  2. 阶段在记录写入时就打好（SetStage），不再事后 UPDATE 回填。
 func (c *releaseJob) releaseHandling() error {
-	s := components.BaseComponents{}
-	s.SetProject(c.Project)
-	s.SetTask(c.Task)
+	s := c.newComponents()
 
-	err := s.InitLocalWorkspace(c.Task.LinkId)
-	c.updateRecord(10)
-	if err != nil {
-		c.failHandling(&s)
+	steps := []struct {
+		name  string
+		stage uint // 与前端步骤条的 6 步对应：10=1 ... 60=6
+		run   func() error
+	}{
+		{"初始化本地工作区", 10, func() error { return s.InitLocalWorkspace(c.Task.LinkId) }},
+		{"初始化目标机版本库", 10, func() error { return s.InitRemoteVersion(c.Task.LinkId) }},
+		{"pre-deploy 任务", 20, func() error { return s.PreDeploy(c.Task.LinkId) }},
+		{"检出代码", 30, func() error { return c.checkout(s) }},
+		{"post-deploy 任务", 40, func() error { return s.PostDeploy(c.Task.LinkId) }},
+		{"同步文件至目标机", 50, func() error { return s.CopyFiles() }},
+		{"更新目标机版本", 60, func() error { return s.UpdateRemoteServers(c.Task.LinkId) }},
+		//这里实际发布已完成 (后置本地脚本任务,)
+		{"last-deploy 任务", 60, func() error { return s.LastDeploy(c.Task.LinkId) }},
+	}
+
+	for _, step := range steps {
+		s.SetStage(step.stage)
+		if err := step.run(); err != nil {
+			c.failHandling(&s, step.name, err)
+			return err
+		}
+	}
+
+	// 走到这里目标机已经切到新版本，清理宿主机临时目录失败不该判成发布失败。
+	// 失败详情在上面那条 record 里已经有了，这里只补一条日志。
+	// （旧实现在这里直接 return，导致 task.is_run 一直是 1，任务永远卡在"正在上线中"）
+	if err := s.CleanUpLocal(c.Task.LinkId); err != nil {
+		logger.Error("清理本地工作区失败 taskId=", c.Task.Id, " ", err)
+	}
+
+	if err := c.changeReleaseData(); err != nil {
+		c.failHandling(&s, "更新上线结果", err)
 		return err
 	}
-	err = s.InitRemoteVersion(c.Task.LinkId)
-	c.updateRecord(10)
-	if err != nil {
-		c.failHandling(&s)
-		return err
-	}
-	err = s.PreDeploy(c.Task.LinkId)
-	c.updateRecord(20)
-	if err != nil {
-		c.failHandling(&s)
-		return err
-	}
-	if c.Project.RepoType == "git" {
+
+	s.AddFinalRecord(true, "", nil)
+	return nil
+}
+
+// checkout 按仓库类型检出代码
+func (c *releaseJob) checkout(s components.BaseComponents) error {
+	switch c.Project.RepoType {
+	case "git":
 		g := components.BaseGit{}
 		g.SetBaseComponents(s)
-		err = g.UpdateToVersion()
-		c.updateRecord(30)
-		if err != nil {
-			c.failHandling(&s)
-			return err
-		}
-	} else if c.Project.RepoType == "file" || c.Project.RepoType == "jenkins" {
+		return g.UpdateToVersion()
+	case "file", "jenkins":
 		f := components.BaseFile{}
 		f.SetBaseComponents(s)
-		err = f.UpdateToVersion()
-		c.updateRecord(30)
-		if err != nil {
-			c.failHandling(&s)
-			return err
-		}
+		return f.UpdateToVersion()
 	}
-
-	err = s.PostDeploy(c.Task.LinkId)
-	c.updateRecord(40)
-	if err != nil {
-		c.failHandling(&s)
-		return err
-	}
-	err = s.CopyFiles()
-	c.updateRecord(50)
-	if err != nil {
-		c.failHandling(&s)
-		return err
-	}
-	err = s.UpdateRemoteServers(c.Task.LinkId)
-	c.updateRecord(60)
-	if err != nil {
-		c.failHandling(&s)
-		return err
-	}
-	//这里实际发布已完成 (后置本地脚本任务,)
-	err = s.LastDeploy(c.Task.LinkId)
-	if err != nil {
-		c.failHandling(&s)
-		return err
-	}
-
-	err = s.CleanUpLocal(c.Task.LinkId)
-	c.updateRecord(100)
-	if err != nil {
-		return err
-	}
-
-	err = c.changeReleaseData()
-	if err != nil {
-		return err
-	}
-
 	return nil
-
 }
 
 func (c *releaseJob) changeReleaseData() error {
@@ -239,22 +243,31 @@ func (c *releaseJob) enableRollBack() error {
 			versions = append(versions, common.GetString(version["link_id"]))
 		}
 		//这里查找需要设置不可回滚的版本 进行清除操作
-		s := components.BaseComponents{}
-		s.SetProject(c.Project)
-		s.SetTask(c.Task)
-		s.CleanUpReleasesVersion(versions)
+		s := c.newComponents()
+		if err := s.CleanUpReleasesVersion(versions); err != nil {
+			logger.Error("清理历史版本失败 taskId=", c.Task.Id, " ", err)
+		}
 	}
 	_, err = db.Exec("UPDATE `task` SET `enable_rollback`='0' WHERE`id` not in (?) and  project_id = ? and  `enable_rollback`=1 ", keepIds, c.Task.ProjectId)
 	return err
 }
 
 // 上线失败处理
-func (c *releaseJob) failHandling(co *components.BaseComponents) {
+//
+// 除了改任务状态，还要留下「哪一步、为什么失败」：
+// 旧实现只改状态，前端既看不到原因，也不知道流程已经终止，会一直空转轮询。
+func (c *releaseJob) failHandling(co *components.BaseComponents, stage string, failErr error) {
 	//修改状态
 	c.Task.Status = 4
 	c.Task.IsRun = 0
 	c.Task.UpdatedAt = time.Now()
-	models.UpdateTaskById(c.Task)
+	if err := models.UpdateTaskById(c.Task); err != nil {
+		logger.Error("更新任务状态失败 taskId=", c.Task.Id, " ", err)
+	}
 	//清理本地版本库
-	co.CleanUpLocal(c.Task.LinkId)
+	if err := co.CleanUpLocal(c.Task.LinkId); err != nil {
+		logger.Error("清理本地工作区失败 taskId=", c.Task.Id, " ", err)
+	}
+	// 终结记录要放在清理之后写，保证它是这次上线的最后一条
+	co.AddFinalRecord(false, stage, failErr)
 }

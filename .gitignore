@@ -308,6 +308,7 @@ OpenCover/
 
 # 前端构建产物：由 frontend/vite.config.js 输出（outDir: ../src/static）
 # Dockerfile 的 node 阶段与 .github/workflows/release.yml 都会重新构建，无需入库
+# 注意：src/views/login.tpl 是手写模板，仍需入 git
 /src/static/
 
 # 同上：vite closeBundle 钩子由 src/static/index.html 复制生成
@@ -316,8 +317,12 @@ OpenCover/
 # 后端编译产物：control build 输出的二进制
 /src/gopub
 
+# 打包产物：control pack 与 release.yml 生成
+/*.tar.gz
+
 # 运行时文件：control start 写入的进程号
 /gopub.pid
+/src/agent/*.pid
 
 # macOS
 .DS_Store

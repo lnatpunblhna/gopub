@@ -3,8 +3,8 @@ package components
 import (
 	"fmt"
 	ldap "github.com/go-ldap/ldap/v3"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 )
 
 type Ldap struct {

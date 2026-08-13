@@ -2,13 +2,13 @@ package p2pcontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/library/p2p/init_sever"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/init_sever"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 type P2pinfo struct {

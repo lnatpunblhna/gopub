@@ -2,8 +2,8 @@ package usercontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/db"
 )
 
 func User(c echo.Context) error {

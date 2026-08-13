@@ -4,25 +4,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/linclin/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/db"
 )
 
 type User struct {
-	Id                     int       `gorm:"column:id;primaryKey;autoIncrement"`
-	Username               string    `gorm:"column:username;size:255"`
-	IsEmailVerified        int8      `gorm:"column:is_email_verified"`
-	AuthKey                string    `gorm:"column:auth_key;size:32"`
-	PasswordHash           string    `gorm:"column:password_hash;size:255"`
-	PasswordResetToken     string    `gorm:"column:password_reset_token;size:255"`
-	EmailConfirmationToken string    `gorm:"column:email_confirmation_token;size:255"`
-	Email                  string    `gorm:"column:email;size:255"`
-	Avatar                 string    `gorm:"column:avatar;size:100"`
-	Role                   int16     `gorm:"column:role"`
-	FromLdap               int16     `gorm:"column:from_ldap"`
-	Status                 int16     `gorm:"column:status"`
-	CreatedAt              time.Time `gorm:"column:created_at;type:datetime;autoCreateTime:false"`
-	UpdatedAt              time.Time `gorm:"column:updated_at;type:datetime;autoUpdateTime:false"`
-	Realname               string    `gorm:"column:realname;size:32"`
+	Id              int    `gorm:"column:id;primaryKey;autoIncrement"`
+	Username        string `gorm:"column:username;size:255"`
+	IsEmailVerified int8   `gorm:"column:is_email_verified"`
+	AuthKey         string `gorm:"column:auth_key;size:32"`
+	// AuthKeyExpireAt 为 auth_key 的过期时刻，NULL 表示没有有效凭据。
+	// 用指针是为了让"无凭据"写成 NULL 而不是 '0000-00-00'（严格模式下会报错）。
+	AuthKeyExpireAt        *time.Time `gorm:"column:auth_key_expire_at;type:datetime"`
+	PasswordHash           string     `gorm:"column:password_hash;size:255"`
+	PasswordResetToken     string     `gorm:"column:password_reset_token;size:255"`
+	EmailConfirmationToken string     `gorm:"column:email_confirmation_token;size:255"`
+	Email                  string     `gorm:"column:email;size:255"`
+	Avatar                 string     `gorm:"column:avatar;size:100"`
+	Role                   int16      `gorm:"column:role"`
+	FromLdap               int16      `gorm:"column:from_ldap"`
+	Status                 int16      `gorm:"column:status"`
+	CreatedAt              time.Time  `gorm:"column:created_at;type:datetime;autoCreateTime:false"`
+	UpdatedAt              time.Time  `gorm:"column:updated_at;type:datetime;autoUpdateTime:false"`
+	Realname               string     `gorm:"column:realname;size:32"`
 }
 
 func (t *User) TableName() string {

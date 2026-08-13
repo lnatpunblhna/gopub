@@ -2,9 +2,10 @@ package confcontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/jumpserver"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/jumpserver"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 )
 
 func ServerGroups(c echo.Context) error {
@@ -14,7 +15,11 @@ func ServerGroups(c echo.Context) error {
 	}
 	enableJumpserver, _ := config.Bool("enableJumpserver")
 	if enableJumpserver {
-		group2id, _ := jumpserver.GetGroups()
+		group2id, err := jumpserver.GetGroups()
+		if err != nil {
+			logger.Error("获取 jumpserver 服务器分组失败:", err)
+			return ctx.SetJson(1, nil, "获取服务器分组失败："+err.Error())
+		}
 		return ctx.SetJson(0, group2id, "")
 	}
 	return ctx.SetJson(0, nil, "")

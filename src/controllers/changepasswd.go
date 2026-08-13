@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -49,5 +49,10 @@ func ChangePasswd(c echo.Context) error {
 	}
 	user.PasswordHash = string(hashedPassword)
 	models.UpdateUserById(&user)
+	// 改密码后吊销该用户的登录凭据，旧 token 不能继续用。
+	// 改的是自己的密码时前端会同步退出登录（见 pages/user/changepasswd.vue）。
+	if err := models.RevokeAuthKey(user.Id); err != nil {
+		logger.Error("改密码后清理登录凭据失败:", err)
+	}
 	return ctx.Json(map[string]interface{}{"code": 0, "msg": "sucess"})
 }

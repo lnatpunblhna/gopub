@@ -10,7 +10,7 @@
         <router-link :to="{ name: 'taskCreate' }">
           <el-button type="primary" icon="plus">创建上线单</el-button>
         </router-link>
-        <router-link :to="{ name: 'confList' }">
+        <router-link v-if="is_admin" :to="{ name: 'confList' }">
           <el-button icon="setting">项目配置</el-button>
         </router-link>
       </div>
@@ -75,7 +75,7 @@
           <span>按项目聚合最近发布次数</span>
         </div>
       </header>
-      <el-tabs v-model="activeName" class="home-tabs" @tab-click="handleClick">
+      <el-tabs v-model="activeName" class="home-tabs" @tab-change="handleTabChange">
         <el-tab-pane label="本日" name="chartsD">
           <div ref="chartsD" class="home-release-chart"></div>
         </el-tab-pane>
@@ -91,7 +91,14 @@
 </template>
 
 <script type="text/javascript">
+  import store from 'store'
   import {port_task} from 'common/port_uri'
+
+  const CHART_QUERY_MAP = {
+    chartsD: 'dayBypro',
+    chartsE: 'weekBypro',
+    chartsF: 'monthBypro'
+  }
 
   export default {
     data() {
@@ -109,15 +116,24 @@
         totalproject: 0,
         totalpubsuccess: 0,
         hostsum: 0,
-        shortcuts: [
+        allShortcuts: [
           {name: 'taskCreate', label: '创建上线单', icon: 'fa-plus-circle'},
           {name: 'taskMyList', label: '我的上线单', icon: 'fa-user'},
-          {name: 'confList', label: '项目配置', icon: 'fa-cubes'},
-          {name: 'p2pCheck', label: 'Agent 状态', icon: 'fa-desktop'}
+          {name: 'confList', label: '项目配置', icon: 'fa-cubes', adminOnly: true},
+          {name: 'p2pCheck', label: 'Agent 状态', icon: 'fa-desktop', adminOnly: true}
         ]
       }
     },
     computed: {
+      user_role() {
+        return store.state.user_info.user && store.state.user_info.user.Role
+      },
+      is_admin() {
+        return Number(this.user_role) === 1
+      },
+      shortcuts() {
+        return this.allShortcuts.filter((item) => !item.adminOnly || this.is_admin)
+      },
       successRate() {
         return `${this.totalpubsuccess || 0}%`
       },
@@ -146,21 +162,22 @@
         this.$nextTick(() => {
           this.create_totalmen()
           this.periodCards.forEach((item) => this.renderPieChart(item))
-          this.create_charts('chartsD', 'dayBypro')
+          this.create_charts(this.activeName, CHART_QUERY_MAP[this.activeName])
         })
       },
-      handleClick(tab) {
-        const queryMap = {
-          chartsD: 'dayBypro',
-          chartsE: 'weekBypro',
-          chartsF: 'monthBypro'
-        }
-        this.create_charts(tab.name, queryMap[tab.name])
+      handleTabChange(name) {
+        // tab-change 直接给出 pane 的 name;此时面板 DOM 尚未切换为可见,需等 nextTick 再初始化图表
+        this.$nextTick(() => {
+          this.create_charts(name, CHART_QUERY_MAP[name])
+        })
       },
-      getChart(ref) {
+      getChartDom(ref) {
         // ref 声明在 v-for 内时 this.$refs[ref] 是数组,需取出真正的 DOM 元素
         const raw = this.$refs[ref]
-        const dom = Array.isArray(raw) ? raw[0] : raw
+        return Array.isArray(raw) ? raw[0] : raw
+      },
+      getChart(ref) {
+        const dom = this.getChartDom(ref)
         if (!dom || !this.echartsInstance) return null
         if (!this.chartInstances[ref]) {
           this.chartInstances[ref] = this.echartsInstance.init(dom)
@@ -244,7 +261,7 @@
 
           const names = rows.map((row) => row.name)
           const values = rows.map((row) => row.task_count)
-          const dom = this.$refs[ref]
+          const dom = this.getChartDom(ref)
           if (dom) {
             dom.style.height = `${Math.max(360, rows.length * 28 + 120)}px`
           }

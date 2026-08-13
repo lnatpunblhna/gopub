@@ -42,7 +42,30 @@ export default defineConfig(({ command }) => ({
   },
   build: {
     outDir: '../src/static',
-    emptyOutDir: true
+    emptyOutDir: true,
+    // 业务 chunk 都在 30 kB 量级;放宽阈值是为了两个已单独拆出的第三方 vendor:
+    // element-plus(全量注册,约 970 kB)与 echarts(路由内懒加载,约 1.1 MB)。
+    // 阈值只覆盖它们,业务代码或其他依赖膨胀时仍会告警。
+    chunkSizeWarningLimit: 1200,
+    // 第三方大库单独成 chunk,避免业务代码与 vendor 混在一个巨型 index.js 里
+    rolldownOptions: {
+      // @vueuse/core(element-plus 的传递依赖)的产物里有 Rolldown 无法识别位置的
+      // /* #__PURE__ */ 注释。第三方源码改不了,且只影响它自身的 DCE 粒度,
+      // 因此只关掉这项检查;其余诊断照常输出。
+      checks: {
+        invalidAnnotation: false
+      },
+      output: {
+        codeSplitting: {
+          groups: [
+            { name: 'echarts', test: /[\\/]node_modules[\\/](echarts|zrender)[\\/]/ },
+            { name: 'element-plus', test: /[\\/]node_modules[\\/](element-plus|@element-plus|@popperjs|@floating-ui|@ctrl[\\/]tinycolor|async-validator|@vueuse)[\\/]/ },
+            { name: 'vue-vendor', test: /[\\/]node_modules[\\/](vue|vue-router|vuex|@vue)[\\/]/ },
+            { name: 'vendor', test: /[\\/]node_modules[\\/]/ }
+          ]
+        }
+      }
+    }
   },
   server: {
     host: '0.0.0.0',

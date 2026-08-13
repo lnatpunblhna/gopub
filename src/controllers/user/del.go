@@ -2,9 +2,9 @@ package usercontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func Del(c echo.Context) error {

@@ -3,7 +3,7 @@ package models
 import (
 	"fmt"
 
-	"github.com/linclin/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/db"
 )
 
 type Migration struct {

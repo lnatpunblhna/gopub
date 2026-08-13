@@ -1,0 +1,31 @@
+gopub
+Copyright 2026 lnatpunblhna
+
+This product includes software developed by linclin and contributors
+(Copyright 2018 linclin), originally distributed at:
+
+    https://github.com/linclin/gopub
+
+Licensed under the Apache License, Version 2.0. See the LICENSE file
+for the full license text.
+
+--------------------------------------------------------------------------------
+
+MODIFICATIONS
+
+This repository is a derivative work of the upstream project above, maintained
+at https://github.com/lnatpunblhna/gopub. Files in this repository have been
+modified relative to upstream. Notable changes include:
+
+  - Go module path changed from github.com/linclin/gopub to
+    github.com/lnatpunblhna/gopub.
+  - HTTP layer migrated from Beego to Echo v4.
+  - JWT library replaced: github.com/dgrijalva/jwt-go (deprecated) ->
+    github.com/golang-jwt/jwt/v5.
+  - Added configurable SSH algorithms for remote file transfers.
+  - Added user deletion feature and assorted bug fixes.
+  - Added Release packaging workflow and automatic git branch adaptation.
+  - Removed generated files from version control.
+
+The complete, authoritative record of modifications is the git history of this
+repository; the list above is a summary and is not exhaustive.

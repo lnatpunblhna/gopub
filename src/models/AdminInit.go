@@ -7,8 +7,8 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 )
 
 func Syncdb() {
@@ -67,7 +67,9 @@ func insertUser() {
 	u.Id = 1
 	u.Username = "admin"
 	u.IsEmailVerified = 1
-	u.AuthKey = "cJIrTa_b2Hnjn6BZkrL8PJkYto2Ael3O"
+	// 不预置 auth_key：写死的初始值等于把一个公开的 admin 凭据装进每套部署里。
+	// 留空后由首次登录签发（models.IssueAuthKey）。
+	u.AuthKey = ""
 	u.PasswordHash = "$2y$13$8q0MfKpnghuqCL.3FAAjiOkA8kBFNCW.ECUlqWp1zTpMHs9e5xn6u"
 	u.EmailConfirmationToken = "UpToOIawm1L8GjN6pLO4r-1oj20nLT5f_1443280741"
 	u.Email = "lnatpunblhna@gmail.com"

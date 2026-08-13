@@ -18,7 +18,9 @@
                       </el-form-item>
                         <div v-if="isShowStatus">
                         <el-form-item label="选取tag:" prop="CommitId" label-width="100px">
-                          <el-select v-model="form.CommitId" filterable placeholder="请选择"
+                          <el-select v-model="form.CommitId" filterable :placeholder="progress.tag.loading ? '正在拉取 tag…' : '请选择'"
+                                     :loading="progress.tag.loading"
+                                     loading-text="正在拉取 tag…"
                                      style="width: 400px;">
                             <el-option
                               v-for="item in tagData"
@@ -27,14 +29,20 @@
                               :value="item.value">
                             </el-option>
                           </el-select>
-                          <el-button @click.stop="get_tag_data" size="small">
+                          <el-button @click.stop="get_tag_data" size="small" :loading="progress.tag.loading">
                             <i class="fa fa-refresh"></i>
                           </el-button>
+                          <div v-if="progress.tag.loading" class="fetch-progress">
+                            <el-progress :percentage="progress.tag.percent" :show-text="false" :stroke-width="3"></el-progress>
+                            <span class="fetch-progress-text">{{ progress_text('tag') }}（已等待 {{ progress.tag.elapsed }}s）</span>
+                          </div>
                         </el-form-item>
                         </div>
                         <div v-else>
                         <el-form-item label="选取分支:" prop="Branch" label-width="100px">
-                            <el-select v-model="form.Branch" filterable placeholder="请选择" @change="get_commit"
+                            <el-select v-model="form.Branch" filterable :placeholder="progress.branch.loading ? '正在拉取分支…' : '请选择'" @change="get_commit"
+                                       :loading="progress.branch.loading"
+                                       loading-text="正在拉取分支…"
                                        style="width: 400px;">
                                 <el-option
                                         v-for="item in branchData"
@@ -43,12 +51,19 @@
                                         :value="item.value">
                                 </el-option>
                             </el-select>
-                            <el-button @click.stop="get_branch_data" size="small">
+                            <el-button @click.stop="get_branch_data" size="small" :loading="progress.branch.loading">
                                 <i class="fa fa-refresh"></i>
                             </el-button>
+                            <div v-if="progress.branch.loading" class="fetch-progress">
+                                <el-progress :percentage="progress.branch.percent" :show-text="false" :stroke-width="3"></el-progress>
+                                <span class="fetch-progress-text">{{ progress_text('branch') }}（已等待 {{ progress.branch.elapsed }}s）</span>
+                            </div>
                         </el-form-item>
                         <el-form-item label="版本选取 :" label-width="100px" prop="CommitId">
-                            <el-select v-model="form.CommitId" filterable placeholder="请选择" style="width: 400px;">
+                            <el-select v-model="form.CommitId" filterable :placeholder="progress.commit.loading ? '正在拉取提交记录…' : '请选择'"
+                                       :loading="progress.commit.loading"
+                                       loading-text="正在拉取提交记录…"
+                                       style="width: 400px;">
                                 <el-option
                                         v-for="item in commitData"
                                         :key="item.value"
@@ -56,6 +71,10 @@
                                         :value="item.value">
                                 </el-option>
                             </el-select>
+                            <div v-if="progress.commit.loading" class="fetch-progress">
+                                <el-progress :percentage="progress.commit.percent" :show-text="false" :stroke-width="3"></el-progress>
+                                <span class="fetch-progress-text">{{ progress_text('commit') }}（已等待 {{ progress.commit.elapsed }}s）</span>
+                            </div>
                         </el-form-item>
                         </div>
                       <el-form-item  label="灰度发布 :" >
@@ -113,6 +132,14 @@
                 route_id: this.$route.query.id,
                 load_data: false,
                 on_submit_loading: false,
+                // 拉分支/tag/提交记录要在服务端跑 git,首次还要整仓 clone,
+                // 拿不到 git 的真实百分比,这里用耗时驱动的进度条 + 阶段文案,先让用户看到"在动"
+                progress: {
+                    branch: {loading: false, percent: 0, elapsed: 0},
+                    tag: {loading: false, percent: 0, elapsed: 0},
+                    commit: {loading: false, percent: 0, elapsed: 0}
+                },
+                timers: {},
                 rules: {
                     Tag: [{required: true, message: '分支不能为空', trigger: 'blur'}],
                     Branch: [{required: true, message: '分支不能为空', trigger: 'blur'}],
@@ -141,8 +168,61 @@
             )
             }
         },
+        beforeUnmount(){
+            Object.keys(this.timers).forEach((key) => {
+                if (this.timers[key]) {
+                    clearInterval(this.timers[key])
+                    clearTimeout(this.timers[key])
+                }
+            })
+            this.timers = {}
+        },
         methods: {
-          get_Project_data(){
+            progress_start(key){
+                const state = this.progress[key]
+                this.progress_clear(key)
+                state.loading = true
+                state.percent = 8 // 起步就给一点,否则第一秒进度条看着像卡住
+                state.elapsed = 0
+                this.timers[key] = setInterval(() => {
+                    state.elapsed += 1
+                    // 前段走快后段放慢,封顶 95%:没拿到结果之前不能显示 100%
+                    state.percent = state.percent < 60
+                        ? Math.min(60, state.percent + 6)
+                        : Math.min(95, state.percent + 2)
+                }, 1000)
+            },
+            progress_done(key){
+                const state = this.progress[key]
+                this.progress_clear(key)
+                state.percent = 100
+                // 让满格露一下再收起,否则进度条一闪而过
+                this.timers[key + '_hide'] = setTimeout(() => {
+                    state.loading = false
+                }, 300)
+            },
+            progress_clear(key){
+                if (this.timers[key]) {
+                    clearInterval(this.timers[key])
+                    this.timers[key] = null
+                }
+                if (this.timers[key + '_hide']) {
+                    clearTimeout(this.timers[key + '_hide'])
+                    this.timers[key + '_hide'] = null
+                }
+            },
+            progress_text(key){
+                const labels = {branch: '分支', tag: 'tag', commit: '提交记录'}
+                const elapsed = this.progress[key].elapsed
+                if (elapsed < 3) {
+                    return '正在连接远程仓库…'
+                }
+                if (elapsed < 15) {
+                    return `正在拉取${labels[key]}…`
+                }
+                return '首次拉取需要完整 clone 仓库,请耐心等待…'
+            },
+            get_Project_data(){
             this.load_data = true
             this.$http.get(port_conf.get, {
               params: {
@@ -164,7 +244,7 @@
               })
           },
             get_commit(){
-                this.load_data = true
+                this.progress_start('commit')
                 this.$http.get(port_git.commit, {
                             params: {
                                 projectId: this.route_id,
@@ -182,15 +262,15 @@
                     }
                 this.commitData = commitData
                 this.CommitId = CommitId
-                this.load_data = false
+                this.progress_done('commit')
             })
             .
                 catch(() => {
-                    this.load_data = false
+                    this.progress_done('commit')
             })
             },
             get_branch_data(){
-                this.load_data = true
+                this.progress_start('branch')
                 this.commitData = []
                 this.form.Branch = null
                 this.form.CommitId = null
@@ -207,15 +287,15 @@
                     branchData.push({label: data[i].message, value: data[i].id})
                 }
                 this.branchData = branchData
-                this.load_data = false
+                this.progress_done('branch')
             })
             .
                 catch(() => {
-                    this.load_data = false
+                    this.progress_done('branch')
             })
             },
             get_tag_data(){
-              this.load_data = true
+              this.progress_start('tag')
               this.$http.get(port_git.getTag, {
                 params: {
                   projectId: this.form.ProjectId
@@ -229,13 +309,12 @@
                       tagData.push({label: data[i].message, value: data[i].id})
                     }
                   }
-                  console.log('--->', tagData)
                   this.tagData = tagData
-                  this.load_data = false
+                  this.progress_done('tag')
                 })
                 .
                 catch(() => {
-                  this.load_data = false
+                  this.progress_done('tag')
                 })
             },
             //提交
@@ -287,3 +366,17 @@
         }
     }
 </script>
+<style lang="scss" scoped>
+.fetch-progress {
+    width: 400px;
+    margin-top: 6px;
+}
+
+.fetch-progress-text {
+    display: block;
+    margin-top: 4px;
+    color: var(--gp-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+</style>

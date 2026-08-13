@@ -1,15 +1,15 @@
 package tasks
 
 import (
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/library/p2p/init_sever"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/init_sever"
+	"github.com/lnatpunblhna/gopub/src/models"
 	"strings"
 	"time"
 
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 )
 
 type emailConfig struct {
@@ -32,7 +32,8 @@ func Check_p2p_angent_status() error {
 		for _, project := range projects {
 			s := components.BaseComponents{}
 			s.SetProject(&project)
-			s.SetTask(&models.Task{Id: -10})
+			s.SetTask(&models.Task{})
+			s.SetScope(models.RecordScopeAgent)
 			ips := s.GetHostIps()
 			ss := init_sever.P2pSvc.CheckAllClient(ips)
 			reIps := []string{}

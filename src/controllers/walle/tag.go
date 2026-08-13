@@ -2,9 +2,9 @@ package wallecontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func Tag(c echo.Context) error {
@@ -15,6 +15,7 @@ func Tag(c echo.Context) error {
 	s := components.BaseComponents{}
 	s.SetProject(ctx.Project)
 	s.SetTask(&models.Task{})
+	s.DisableRecord()
 	g := components.BaseGit{}
 	g.SetBaseComponents(s)
 	res, err := g.GetTagList(200)

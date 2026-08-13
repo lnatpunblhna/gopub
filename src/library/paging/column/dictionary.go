@@ -1,8 +1,8 @@
 package column
 
 import (
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/paging"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/paging"
 	"strings"
 )
 

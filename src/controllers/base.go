@@ -15,10 +15,9 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 // Ctx 是各 handler 共用的请求上下文，取代原先的 BaseController。
@@ -46,32 +45,24 @@ func New(c echo.Context) *Ctx {
 		}
 	}()
 
+	// 走过 RequireLogin / RequireAdmin 的请求这里直接命中缓存，不会重复查库。
+	// 必须先解析出登录用户，下面按 ID 加载项目 / 上线单时要用它做权限判断。
+	ctx.User = CurrentUser(c)
+
+	// 只有确实有权限时才把对象挂到上下文里；无权限（含未登录）时保持 nil，
+	// 由各 handler 已有的 `ctx.Project == nil` / `ctx.Task == nil` 判断拦下。
+	// 这样 URL 上换个 projectId 就能读写别人项目的老问题被统一堵住。
 	if taskId := ctx.GetString("taskId"); taskId != "" {
-		ctx.Task, _ = models.GetTaskById(common.GetInt(taskId))
+		if task, err := models.GetTaskById(common.GetInt(taskId)); err == nil && CanAccessTask(ctx.User, task) {
+			ctx.Task = task
+		}
 	}
 	if projectId := ctx.GetString("projectId"); projectId != "" {
-		ctx.Project, _ = models.GetProjectById(common.GetInt(projectId))
+		if project, err := models.GetProjectById(common.GetInt(projectId)); err == nil && CanAccessProject(ctx.User, project) {
+			ctx.Project = project
+		}
 	}
-	ctx.User = ctx.userByToken()
 	return ctx
-}
-
-// userByToken 解析 `Authorization: TOKEN xxx` 头并查出对应用户
-func (c *Ctx) userByToken() *models.User {
-	ah := c.Request().Header.Get("Authorization")
-	if len(ah) <= 5 || strings.ToUpper(ah[0:5]) != "TOKEN" {
-		return nil
-	}
-	token := ah[6:]
-	if token == "" {
-		return nil
-	}
-	var users []models.User
-	n, err := db.QueryRows(&users, "SELECT * FROM `user` WHERE auth_key= ?", token)
-	if n > 0 && err == nil {
-		return &users[0]
-	}
-	return nil
 }
 
 // cacheBody 读出请求体并复位，使其可被重复读取

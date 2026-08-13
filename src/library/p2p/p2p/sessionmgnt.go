@@ -2,7 +2,7 @@ package p2p
 
 import (
 	log "github.com/cihub/seelog"
-	"github.com/linclin/gopub/src/library/p2p/common"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/common"
 )
 
 type global struct {

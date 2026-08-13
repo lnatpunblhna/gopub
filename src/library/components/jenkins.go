@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/bndr/gojenkins"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 	"net/url"
 	"regexp"
 	"strings"

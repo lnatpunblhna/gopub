@@ -1,10 +1,10 @@
 package init_sever
 
 import (
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/library/p2p/common"
-	"github.com/linclin/gopub/src/library/p2p/server"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/common"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/server"
 	"os"
 )
 

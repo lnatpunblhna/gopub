@@ -93,7 +93,10 @@
           })
         })
 
-        return [groupMap[2], groupMap[3], groupMap[1], groupMap[0]].filter((group) => group.options.length > 0)
+        // 预发布/线上环境固定展示（即使没有项目也显示统计），其余环境有项目时才展示
+        return [groupMap[2], groupMap[3]].concat(
+          [groupMap[1], groupMap[0]].filter((group) => group.options.length > 0)
+        )
       },
       activeGroup() {
         return this.projectGroups.find((group) => Number(group.level) === Number(this.activeLevel)) || this.projectGroups[0] || null
@@ -131,8 +134,11 @@
             return
           }
         }
-        if (!this.activeGroup && this.projectGroups.length > 0) {
-          this.activeLevel = this.projectGroups[0].level
+        if (!this.activeGroup || this.activeOptions.length === 0) {
+          const firstGroup = this.projectGroups.find((group) => group.options.length > 0)
+          if (firstGroup) {
+            this.activeLevel = firstGroup.level
+          }
         }
       },
       reset_action_state() {
@@ -308,8 +314,8 @@
 }
 
 .environment-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 22px;
 }
@@ -321,6 +327,8 @@
     "title count"
     "meta count";
   align-items: center;
+  flex: 0 0 auto;
+  width: 200px;
   min-height: 74px;
   padding: 14px 16px;
   border: 1px solid var(--gp-border-soft);

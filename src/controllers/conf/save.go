@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func Save(c echo.Context) error {
@@ -24,6 +24,11 @@ func Save(c echo.Context) error {
 		oldProject, err := models.GetProjectById(project.Id)
 		if err != nil {
 			return ctx.SetJson(1, nil, "项目不存在")
+		}
+		// 必须拿库里的旧记录判断权限：请求体里的 level 等字段可被伪造，
+		// 用它判断的话 Role=10 只需把 level 填成 2 就能改任意项目
+		if !controllers.CanAccessProject(ctx.User, oldProject) {
+			return ctx.SetJson(1, nil, "无权限操作该项目")
 		}
 		project.UserId = oldProject.UserId
 		if project.UserId == 0 && ctx.User != nil && ctx.User.Id != 0 {

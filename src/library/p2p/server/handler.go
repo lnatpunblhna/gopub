@@ -7,7 +7,7 @@ import (
 	"errors"
 	log "github.com/cihub/seelog"
 	"github.com/julienschmidt/httprouter"
-	"github.com/linclin/gopub/src/library/p2p/p2p"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/p2p"
 	"io/ioutil"
 	"strconv"
 	"strings"

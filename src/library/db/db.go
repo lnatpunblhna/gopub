@@ -13,8 +13,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"

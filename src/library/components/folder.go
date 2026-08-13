@@ -3,11 +3,11 @@ package components
 import ()
 import (
 	"fmt"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/library/p2p/init_sever"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/init_sever"
+	"github.com/lnatpunblhna/gopub/src/models"
 	"strings"
 	"time"
 )

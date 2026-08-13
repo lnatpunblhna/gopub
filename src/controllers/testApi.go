@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func TestApi(c echo.Context) error {

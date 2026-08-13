@@ -29,7 +29,7 @@
                 <el-tabs v-if="!route_id" v-model="form.RepoType" type="card" @tab-click="handleClick">
                   <el-tab-pane label="Git" name="git">
                     <el-form-item label="地址" prop="RepoUrl">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content=" git格式:ssh-url，需要把宿主机php进程用户的ssh-key加入git信任"
                                   placement="top">
                         <el-input v-model="form.RepoUrl"
@@ -39,7 +39,7 @@
                   </el-tab-pane>
                   <el-tab-pane label="File" name="file">
                     <el-form-item label="地址" prop="RepoUrl">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content="发布包的http地址"
                                   placement="top">
                         <el-input v-model="form.RepoUrl"
@@ -49,7 +49,7 @@
                   </el-tab-pane>
                   <el-tab-pane label="Jenkins" name="jenkins">
                     <el-form-item label="jenkins地址" prop="RepoUrl">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content="job页jenkins地址，类似http://jenkins.xxxxx.com/job/项目名称/"
                                   placement="top">
                         <el-input v-model="form.RepoUrl"
@@ -59,7 +59,7 @@
                   </el-tab-pane>
                 </el-tabs>
                 <el-form-item v-if="route_id" label="地址" prop="RepoUrl">
-                  <el-tooltip class="item" effect="dark"
+                  <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                               content="支持git/svn。git格式:ssh-url，需要把宿主机php进程用户的ssh-key加入git信任"
                               placement="top">
                     <el-input v-model="form.RepoUrl"
@@ -72,12 +72,12 @@
               <section class="form-section">
                 <h3><span class="section-title">宿主机</span></h3>
                   <el-form-item label="代码检出仓库" prop="DeployFrom">
-                    <el-tooltip class="item" effect="dark" content="代码的检出存放路径" placement="top">
+                    <el-tooltip class="item" :trigger-keys="[]" effect="dark" content="代码的检出存放路径" placement="top">
                       <el-input v-model="form.DeployFrom" placeholder="/data/gopub"></el-input>
                     </el-tooltip>
                   </el-form-item>
                   <el-form-item label="排除文件" prop="Excludes">
-                    <el-tooltip class="item" effect="dark" content="剔除不上线的文件、目录，每行一个"
+                    <el-tooltip class="item" :trigger-keys="[]" effect="dark" content="剔除不上线的文件、目录，每行一个"
                                 placement="top">
                       <el-input type="textarea" autosize v-model="form.Excludes" placeholder=".git
 README.md"></el-input>
@@ -87,26 +87,26 @@ README.md"></el-input>
               <section class="form-section">
                 <h3><span class="section-title">目标机</span></h3>
                     <el-form-item label="用户" prop="ReleaseUser">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content="代码的部署的用户，一般是运行的服务的用户，如php进程用户www" placement="top">
                         <el-input v-model="form.ReleaseUser" placeholder="www"></el-input>
                       </el-tooltip>
                     </el-form-item>
                     <el-form-item label="webroot" prop="ReleaseTo">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content="代码的最终部署路径，请不要在目标机新建此目录，walle会自动生成此软链，正确设置父目级录即可"
                                   placement="top">
                         <el-input v-model="form.ReleaseTo" placeholder="/data/wwwroot/xxx"></el-input>
                       </el-tooltip>
                     </el-form-item>
                     <el-form-item label="发布版本库" prop="ReleaseLibrary">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content="代码发布的版本库，每次发布更新webroot的软链到当前最新版本" placement="top">
                         <el-input v-model="form.ReleaseLibrary" placeholder="/data/gopub_releases"></el-input>
                       </el-tooltip>
                     </el-form-item>
                     <el-form-item label="版本保留数" prop="KeepVersionNum">
-                      <el-tooltip class="item" effect="dark" content="过多的历史版本将被删除，只可回滚保留的版本"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark" content="过多的历史版本将被删除，只可回滚保留的版本"
                                   placement="top">
                         <el-input-number v-model="form.KeepVersionNum" placeholder="20"
                                          :max="100" :min="1" :value="20"
@@ -130,7 +130,7 @@ README.md"></el-input>
                       </el-radio-group>
                     </el-form-item>
                     <el-form-item v-if="!form.IsGroup" label="机器列表" prop="Hosts">
-                      <el-tooltip class="item" effect="dark" content="要发布的机器列表，一行一个，默认22端口"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark" content="要发布的机器列表，一行一个，默认22端口"
                                   placement="top">
                         <el-input type="textarea" autosize v-model="form.Hosts" placeholder="192.168.0.1
 192.168.0.2:21"></el-input>
@@ -142,7 +142,7 @@ README.md"></el-input>
                       </div>
                       <ul class="host-group-list">
                         <li v-for="(value, key) in hosts" :key="key">
-                          <el-tooltip class="item" effect="dark" content="要发布的机器列表，一行一个，22端口"
+                          <el-tooltip class="item" :trigger-keys="[]" effect="dark" content="要发布的机器列表，一行一个，22端口"
                                       placement="top">
                             <el-input type="textarea" autosize v-model="hosts[key]" placeholder="192.168.0.1
 192.168.0.2:21"></el-input>
@@ -166,35 +166,35 @@ README.md"></el-input>
                   </el-tooltip>
                 </h3>
                     <el-form-item label="代码检出前任务" prop="PreDeploy">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content="在部署代码之前的准备工作，如git的一些前置检查、vendor的安装（更新），一行一条"
                                   placement="top">
                         <el-input type="textarea" autosize v-model="form.PreDeploy"></el-input>
                       </el-tooltip>
                     </el-form-item>
                     <el-form-item label="代码检出后任务" prop="PostDeploy">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content="git代码检出之后，可能做一些调整处理，如vendor拷贝，环境适配（mv config-test.php config.php），一行一条"
                                   placement="top">
                         <el-input type="textarea" autosize v-model="form.PostDeploy"></el-input>
                       </el-tooltip>
                     </el-form-item>
                     <el-form-item label="同步完目标机后任务" prop="PreRelease">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content='同步完所有目标机器之后，更改版本软链之前触发任务。java可能要做一些暂停服务的操作'
                                   placement="top">
                         <el-input type="textarea" autosize v-model="form.PreRelease"></el-input>
                       </el-tooltip>
                     </el-form-item>
                     <el-form-item label="更改版本软链接后任务" prop="PostRelease">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content='所有目标机器都部署完毕之后，做一些清理工作，如删除缓存、重启服务（nginx、php、task），一行一条'
                                   placement="top">
                         <el-input type="textarea" autosize v-model="form.PostRelease"></el-input>
                       </el-tooltip>
                     </el-form-item>
                     <el-form-item label="发布完成本地任务" prop="LastDeploy">
-                      <el-tooltip class="item" effect="dark"
+                      <el-tooltip class="item" :trigger-keys="[]" effect="dark"
                                   content='一行一条,相关参数{WORKSPACE},{VERSION},{HOSTS},{PROJECT_ID},{PROJECT_NAME},{TASK_ID},{TASK_LINKID}'
                                   placement="top">
                         <el-input type="textarea" autosize v-model="form.LastDeploy"></el-input>

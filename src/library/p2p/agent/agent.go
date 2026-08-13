@@ -2,8 +2,8 @@ package agent
 
 import (
 	"github.com/julienschmidt/httprouter"
-	"github.com/linclin/gopub/src/library/p2p/common"
-	"github.com/linclin/gopub/src/library/p2p/p2p"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/common"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/p2p"
 	"os"
 )
 

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	log "github.com/cihub/seelog"
-	"github.com/linclin/gopub/src/library/p2p/common"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/common"
 
 	"runtime"
 )

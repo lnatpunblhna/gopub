@@ -1,12 +1,12 @@
 package paging
 
 import (
-	"github.com/linclin/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/common"
 	"strconv"
 	"strings"
 
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 )
 
 /**

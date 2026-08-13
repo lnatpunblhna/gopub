@@ -1,6 +1,8 @@
 import 'normalize.css'
 import 'element-plus/dist/index.css'
-import 'font-awesome/scss/font-awesome.scss'
+// 用预编译 CSS 而非 SCSS 源码:font-awesome 4.x 的 scss 仍是 @import / $a / $b 写法,
+// 会在 Dart Sass 里刷弃用警告,而两者产物等价
+import 'font-awesome/css/font-awesome.css'
 
 import { createApp } from 'vue'
 import ElementPlus from 'element-plus'

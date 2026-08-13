@@ -2,13 +2,12 @@ package wallecontrollers
 
 import (
 	"os"
-	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/library/p2p/init_sever"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/init_sever"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func Detection(c echo.Context) error {
@@ -18,7 +17,10 @@ func Detection(c echo.Context) error {
 	}
 	s := components.BaseComponents{}
 	s.SetProject(ctx.Project)
-	s.SetTask(&models.Task{Id: -1})
+	s.SetTask(&models.Task{})
+	// 检测没有上线单，按 scope + 操作人归档，避免多人同时检测时日志串在一起
+	s.SetScope(models.RecordScopeDetect)
+	s.SetOperatorFromUser(ctx.User)
 	codeBaseDir := s.GetDeployFromDir()
 	//1:本地文件权限加成
 	if _, err := os.Stat(codeBaseDir); err != nil {
@@ -65,17 +67,21 @@ func Detection(c echo.Context) error {
 	if ctx.Project.P2p == 1 {
 		//这里做alive检测
 		ips := s.GetHostIps()
-		start := time.Now()
-		createdAt := int(start.Unix())
-		rid := s.SaveRecord("chick p2p agent")
+		rid := s.SaveRecord("check p2p agent")
 		ss := init_sever.P2pSvc.CheckAllClient(ips)
-		for _, status := range ss {
+		detail := ""
+		dead := false
+		for ip, status := range ss {
+			detail += ip + ": " + status + "\n"
 			if status == "dead" {
-				s.SaveRecordRes(rid, 0, createdAt, 0, ss)
-				return ctx.SetJson(1, nil, "p2p agent 未启动")
+				dead = true
 			}
 		}
-		s.SaveRecordRes(rid, 0, createdAt, 1, ss)
+		if dead {
+			s.SaveRecordNote(rid, false, "p2p agent 未启动\n"+detail)
+			return ctx.SetJson(1, nil, "p2p agent 未启动")
+		}
+		s.SaveRecordNote(rid, true, detail)
 	}
 	return ctx.SetJson(0, nil, "")
 }

@@ -11,7 +11,7 @@
                             <el-input v-model="form.Title" placeholder="请输入标题" style="width: 500px;"></el-input>
                         </el-form-item>
                         <el-form-item label="url:" prop="CommitId" label-width="100px">
-                            <el-tooltip class="item" effect="dark" content='若有http开头则不拼接配置文件的地址' placement="top">
+                            <el-tooltip class="item" :trigger-keys="[]" effect="dark" content='若有http开头则不拼接配置文件的地址' placement="top">
                                 <el-input v-model="form.CommitId" @change="change_data" placeholder="请输入url"
                                           style="width: 500px;"></el-input>
                             </el-tooltip>     <el-button @click.stop="get_md5_data" size="small">
@@ -21,7 +21,7 @@
                         </el-form-item>
 
                         <el-form-item label="md5 :" label-width="100px">
-                            <el-tooltip class="item" effect="dark" content='当MD5不为空时，会检查下载文件的nd5' placement="top">
+                            <el-tooltip class="item" :trigger-keys="[]" effect="dark" content='当MD5不为空时，会检查下载文件的nd5' placement="top">
                                 <el-input v-model="form.FileMd5" @change="change_md5data" placeholder="请输入md5"
                                           style="width: 500px;"></el-input>
                             </el-tooltip>

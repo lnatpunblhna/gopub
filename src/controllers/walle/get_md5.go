@@ -2,9 +2,10 @@ package wallecontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func GetMd5(c echo.Context) error {
@@ -13,9 +14,14 @@ func GetMd5(c echo.Context) error {
 		return ctx.SetJson(1, nil, "Parameter error")
 	}
 	url := ctx.GetString("url")
+	// url 会被拼进 wget / md5sum 命令，必须先挡住 shell 元字符（components 层还有一道）
+	if err := common.ValidDownloadRef(url); err != nil {
+		return ctx.SetJson(1, nil, "制品地址不合法—"+err.Error())
+	}
 	s := components.BaseComponents{}
 	s.SetProject(ctx.Project)
 	s.SetTask(&models.Task{})
+	s.DisableRecord()
 	f := components.BaseFile{}
 	f.SetBaseComponents(s)
 	err := f.UpdateRepo(url, "")

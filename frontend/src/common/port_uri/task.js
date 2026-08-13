@@ -9,3 +9,5 @@ export const rollback = API_URL + '/api/get/task/rollback'
 export const flush = API_URL + '/api/get/walle/flush'
 export const chart = API_URL + '/api/get/task/chart'
 export const changes = API_URL + '/api/get/task/changes'
+// 上线单的失败原因（task_err_log）
+export const errlog = API_URL + '/api/get/task/errlog'

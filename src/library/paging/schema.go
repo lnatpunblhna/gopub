@@ -1,7 +1,7 @@
 package paging
 
 import (
-	"github.com/linclin/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/common"
 )
 
 var pagingSchemaCache map[string]common.Info = map[string]common.Info{}

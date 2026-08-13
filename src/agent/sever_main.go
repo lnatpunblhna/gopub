@@ -5,8 +5,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/linclin/gopub/src/library/p2p/common"
-	"github.com/linclin/gopub/src/library/p2p/server"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/common"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/server"
 	"os"
 	"os/signal"
 )

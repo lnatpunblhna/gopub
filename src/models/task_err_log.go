@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/linclin/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/db"
 )
 
 type TaskErrLog struct {

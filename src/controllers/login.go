@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/ldap"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/ldap"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -40,9 +39,10 @@ func Login(c echo.Context) error {
 		if !isOk {
 			return ctx.SetJson(1, nil, msg)
 		}
-		userAuth := common.Md5String(user.Username + common.GetString(time.Now().Unix()))
-		user.AuthKey = userAuth
-		models.UpdateUserById(&user)
+		if err := models.IssueAuthKey(&user); err != nil {
+			logger.Error("签发登录凭据失败:", err)
+			return ctx.SetJson(1, nil, "登录失败，请重试")
+		}
 		return ctx.SetJson(0, user, "")
 	}
 
@@ -50,10 +50,9 @@ func Login(c echo.Context) error {
 	if err != nil {
 		return ctx.SetJson(1, nil, "用户名或密码错误")
 	}
-	if user.AuthKey == "" {
-		userAuth := common.Md5String(user.Username + common.GetString(time.Now().Unix()))
-		user.AuthKey = userAuth
-		models.UpdateUserById(&user)
+	if err := models.IssueAuthKey(&user); err != nil {
+		logger.Error("签发登录凭据失败:", err)
+		return ctx.SetJson(1, nil, "登录失败，请重试")
 	}
 	user.PasswordHash = ""
 	return ctx.SetJson(0, user, "")

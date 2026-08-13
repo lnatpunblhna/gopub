@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/p2p/init_sever"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/init_sever"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func Agent(c echo.Context) error {
@@ -20,7 +20,9 @@ func Agent(c echo.Context) error {
 
 	s := components.BaseComponents{}
 	s.SetProject(ctx.Project)
-	s.SetTask(&models.Task{Id: -3})
+	s.SetTask(&models.Task{})
+	s.SetScope(models.RecordScopeAgent)
+	s.SetOperatorFromUser(ctx.User)
 	ips := s.GetHostIps()
 	ss := init_sever.P2pSvc.CheckAllClient(ips)
 	reIps := []string{}
@@ -49,6 +51,8 @@ func AgentStart(c echo.Context) error {
 	json.Unmarshal(ctx.RequestBody(), &ips)
 	s := components.BaseComponents{}
 	s.SetProject(ctx.Project)
+	s.SetScope(models.RecordScopeAgent)
+	s.SetOperatorFromUser(ctx.User)
 	AgentDestDir := config.String("AgentDestDir")
 	err := s.StartP2pAgent(ips, AgentDestDir)
 	if err != nil {

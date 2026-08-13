@@ -2,8 +2,8 @@ package p2pcontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/p2p/init_sever"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/init_sever"
 )
 
 func Task(c echo.Context) error {

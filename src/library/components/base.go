@@ -1,15 +1,13 @@
 package components
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/cucued/sshexec"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/jumpserver"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/library/ssh"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/jumpserver"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	gopubssh "github.com/lnatpunblhna/gopub/src/library/ssh"
+	"github.com/lnatpunblhna/gopub/src/models"
 	"regexp"
 	"strings"
 	"time"
@@ -24,6 +22,15 @@ type BaseComponents struct {
 	name    string
 	project *models.Project
 	task    *models.Task
+
+	// 记录归属：scope 区分上线 / 检测 / 刷新等，operatorId 用于把
+	// 没有上线单的操作按人隔离，recordOff 则完全关闭写库（只读查询用）。
+	// 详见 record.go
+	scope      string
+	stage      uint
+	attempt    int
+	operatorId uint
+	recordOff  bool
 }
 
 func (c *BaseComponents) SetProject(project *models.Project) {
@@ -37,19 +44,13 @@ func (c *BaseComponents) SetTask(task *models.Task) {
 /**
 * 执行本地宿主机命令
  */
-func (c *BaseComponents) runLocalCommand(command string) (sshexec.ExecResult, error) {
+func (c *BaseComponents) runLocalCommand(command string) (gopubssh.ExecResult, error) {
 	id := c.SaveRecord(command)
 	s, err := gopubssh.CommandLocal(command, SSHTIMEOUT)
-	ss, _ := json.Marshal(s)
-	go c.LogTaskCommond(string(ss))
-	//获取执行时间
-	duration := common.GetInt(s.EndTime.Sub(s.StartTime).Seconds())
-	createdAt := int(s.StartTime.Unix())
-	status := 1
-	if s.Error != nil {
-		status = 0
+	if err != nil {
+		logger.Error("本地命令执行失败:", command, err)
 	}
-	c.SaveRecordRes(id, duration, createdAt, status, s)
+	c.SaveRecordRes(id, "local", []gopubssh.ExecResult{s}, err)
 	return s, err
 
 }
@@ -57,7 +58,7 @@ func (c *BaseComponents) runLocalCommand(command string) (sshexec.ExecResult, er
 /**
 * 执行远端目标机命令
  */
-func (c *BaseComponents) runRemoteCommand(command string, hosts []string) ([]sshexec.ExecResult, error) {
+func (c *BaseComponents) runRemoteCommand(command string, hosts []string) ([]gopubssh.ExecResult, error) {
 	if len(hosts) == 0 {
 		hostsInfo := c.GetHosts()
 		for _, info := range hostsInfo {
@@ -65,27 +66,16 @@ func (c *BaseComponents) runRemoteCommand(command string, hosts []string) ([]ssh
 		}
 	}
 	id := c.SaveRecord(command)
-	start := time.Now()
-	createdAt := int(start.Unix())
 	sshExecAgent := gopubssh.RemoteAgent{}
 	sshExecAgent.Worker = SSHWorker
 	sshExecAgent.TimeOut = time.Duration(SSHREMOTETIMEOUT) * time.Second
 	sshExecAgent.Algorithm = gopubssh.SSHAlgorithm(c.project.SshAlgorithm)
 	port, _ := config.Int("SshPort")
-	logger.Info(hosts)
-	logger.Info(port)
 	s, err := sshExecAgent.SshHostByKey(hosts, port, c.project.ReleaseUser, command)
-	logger.Info(err)
-	ss, _ := json.Marshal(s)
-	go c.LogTaskCommond(string(ss))
-	//获取执行时间
-	duration := common.GetInt(time.Now().Sub(start).Seconds())
-
-	status := 1
 	if err != nil {
-		status = 0
+		logger.Error("远端命令执行失败:", hosts, err)
 	}
-	c.SaveRecordRes(id, duration, createdAt, status, s)
+	c.SaveRecordRes(id, "remote", s, err)
 	return s, err
 
 }
@@ -93,31 +83,24 @@ func (c *BaseComponents) runRemoteCommand(command string, hosts []string) ([]ssh
 /**
 * 执行远端传输文件
  */
-func (c *BaseComponents) copyFilesBySftp(src string, dest string, hosts []string) ([]sshexec.ExecResult, error) {
+func (c *BaseComponents) copyFilesBySftp(src string, dest string, hosts []string) ([]gopubssh.ExecResult, error) {
 	if len(hosts) == 0 {
 		hostsInfo := c.GetHosts()
 		for _, info := range hostsInfo {
 			hosts = append(hosts, info.AllHost)
 		}
 	}
-	id := c.SaveRecord("Transfer")
-	start := time.Now()
-	createdAt := int(start.Unix())
+	id := c.SaveRecord("Transfer " + src + " -> " + dest)
 	sshExecAgent := gopubssh.RemoteAgent{}
 	sshExecAgent.Worker = SSHWorker
 	sshExecAgent.TimeOut = time.Duration(SSHREMOTETIMEOUT) * time.Second
 	sshExecAgent.Algorithm = gopubssh.SSHAlgorithm(c.project.SshAlgorithm)
 	port, _ := config.Int("SshPort")
 	s, err := sshExecAgent.SftpHostByKey(hosts, port, c.project.ReleaseUser, src, dest)
-	ss, _ := json.Marshal(s)
-	go c.LogTaskCommond(string(ss))
-	//获取执行时间
-	duration := common.GetInt(time.Now().Sub(start).Seconds())
-	status := 1
 	if err != nil {
-		status = 0
+		logger.Error("文件传输失败:", src, "->", dest, err)
 	}
-	c.SaveRecordRes(id, duration, createdAt, status, s)
+	c.SaveRecordRes(id, "transfer", s, err)
 	return s, err
 
 }
@@ -125,10 +108,8 @@ func (c *BaseComponents) copyFilesBySftp(src string, dest string, hosts []string
 /**
 * 执行远端传输文件 p2p方式
  */
-func (c *BaseComponents) copyFilesByP2p(id string, src string, dest string, hosts []string) ([]sshexec.ExecResult, error) {
-	start := time.Now()
-	rid := c.SaveRecord("Transfer by p2p")
-	createdAt := int(start.Unix())
+func (c *BaseComponents) copyFilesByP2p(id string, src string, dest string, hosts []string) ([]gopubssh.ExecResult, error) {
+	rid := c.SaveRecord("Transfer by p2p " + src + " -> " + dest)
 	if len(hosts) == 0 {
 		hostsInfo := c.GetHosts()
 		for _, info := range hostsInfo {
@@ -136,16 +117,10 @@ func (c *BaseComponents) copyFilesByP2p(id string, src string, dest string, host
 		}
 	}
 	s, err := gopubssh.TransferByP2p(id, hosts, c.project.ReleaseUser, src, dest, SSHREMOTETIMEOUT, gopubssh.SSHAlgorithm(c.project.SshAlgorithm))
-	ss, _ := json.Marshal(s)
-	go c.LogTaskCommond(string(ss))
-	//获取执行时间
-	duration := common.GetInt(time.Now().Sub(start).Seconds())
-
-	status := 1
 	if err != nil {
-		status = 0
+		logger.Error("p2p 传输失败:", src, "->", dest, err)
 	}
-	c.SaveRecordRes(rid, duration, createdAt, status, s)
+	c.SaveRecordRes(rid, "transfer", s, err)
 	return s, err
 
 }
@@ -173,7 +148,11 @@ func (c *BaseComponents) GetHosts_jumpserver() []HostInfo {
 	port := 22
 	if len(aGroupid) > 0 {
 		for _, gid := range aGroupid {
-			aIp2hostname, _ := jumpserver.GetIpsByGroupid(string(gid))
+			aIp2hostname, err := jumpserver.GetIpsByGroupid(string(gid))
+			if err != nil {
+				// 取不到就会以空主机列表继续发布，必须留痕
+				logger.Error("从 jumpserver 获取节点", gid, "的资产失败:", err)
+			}
 			if len(aIp2hostname) > 0 {
 				for ip, _ := range aIp2hostname {
 					res = append(res,
@@ -357,59 +336,6 @@ func (c *BaseComponents) GetGitProjectName(gitUrl string) string {
 		return "filedir"
 	}
 	return snames[0]
-}
-
-func (c *BaseComponents) LogTaskCommond(value interface{}) {
-
-	////设置日志
-	//fn := "logs/task_log/task-" + time.Now().Format("20060102") + ".log"
-	//if _, err := os.Stat(fn); err != nil {
-	//	if os.IsNotExist(err) {
-	//		os.Create(fn)
-	//	}
-	//}
-	//log := logs.NewLogger(1)
-	//log.SetLogger("file", `{"filename":"` + fn + `"}`)
-	//log.Info("---------------------------------")
-	//log.Info("id:%d > %s\n", c.task.Id, value)
-	//log.Info("---------------------------------")
-}
-func (c *BaseComponents) SaveRecord(command string) int {
-	re := models.Record{}
-	re.Command = command
-	if c.task == nil || c.task.Id == 0 {
-		re.TaskId = -99
-		re.UserId = 0
-	} else {
-		re.TaskId = int64(c.task.Id)
-		re.UserId = c.task.UserId
-	}
-	re.Status = 1
-	id, err := models.AddRecord(&re)
-	if err != nil {
-		logger.Error(err)
-	}
-	return int(id)
-}
-func (c *BaseComponents) SaveRecordRes(id int, duration int, createdAt int, status int, value interface{}) {
-	logger.Info(value)
-	if duration < 0 {
-		duration = 0
-	}
-	re, err := models.GetRecordById(id)
-	if err != nil {
-		logger.Error(err)
-		return
-	}
-	re.Duration = duration
-	sResult, _ := json.Marshal(value)
-	re.CreatedAt = createdAt
-	re.Memo = string(sResult)
-	re.Status = int16(status)
-	err = models.UpdateRecordById(re)
-	if err != nil {
-		logger.Error(err)
-	}
 }
 
 /**

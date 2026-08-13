@@ -3,7 +3,7 @@ package components
 import (
 	"errors"
 	"fmt"
-	"github.com/linclin/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/common"
 	"os"
 	"strings"
 )
@@ -16,6 +16,9 @@ func (c *BaseFile) SetBaseComponents(b BaseComponents) {
 	c.baseComponents = b
 }
 func (c *BaseFile) UpdateRepo(url string, fileDir string) error {
+	if err := common.ValidDownloadRef(url); err != nil {
+		return err
+	}
 	if fileDir == "" {
 		fileDir = c.baseComponents.GetDeployFromDir()
 	}
@@ -33,18 +36,19 @@ func (c *BaseFile) UpdateRepo(url string, fileDir string) error {
 	if _, err := os.Stat(dotFile); err != nil {
 		if os.IsNotExist(err) {
 			cmds := []string{}
-			cmds = append(cmds, fmt.Sprintf("mkdir -p %s ", dotFile))
-			cmds = append(cmds, fmt.Sprintf("cd %s ", fileDir))
-			cmds = append(cmds, fmt.Sprintf("wget '%s'", url))
+			cmds = append(cmds, fmt.Sprintf("mkdir -p %s ", common.ShellQuote(dotFile)))
+			cmds = append(cmds, fmt.Sprintf("cd %s ", common.ShellQuote(fileDir)))
+			cmds = append(cmds, fmt.Sprintf("wget %s", common.ShellQuote(url)))
 			cmd := strings.Join(cmds, "&&")
 			_, err := c.baseComponents.runLocalCommand(cmd)
 			return err
 		}
 	}
 	cmds := []string{}
-	cmds = append(cmds, fmt.Sprintf("cd %s ", dotFile))
-	cmds = append(cmds, fmt.Sprintf("rm -rf *"))
-	cmds = append(cmds, fmt.Sprintf("wget --no-check-certificate '%s'", url))
+	cmds = append(cmds, fmt.Sprintf("cd %s ", common.ShellQuote(dotFile)))
+	// rm -rf * 依赖 shell 通配符展开,这里不能引用
+	cmds = append(cmds, "rm -rf *")
+	cmds = append(cmds, fmt.Sprintf("wget --no-check-certificate %s", common.ShellQuote(url)))
 	cmd := strings.Join(cmds, "&&")
 	_, err := c.baseComponents.runLocalCommand(cmd)
 	return err
@@ -78,6 +82,9 @@ func (c *BaseFile) UpdateToVersion() error {
  *
  */
 func (c *BaseFile) CheckFiles(url string, fileDir string) ([]map[string]string, error) {
+	if err := common.ValidDownloadRef(url); err != nil {
+		return nil, err
+	}
 	if fileDir == "" {
 		fileDir = c.baseComponents.GetDeployFromDir()
 	}
@@ -92,8 +99,8 @@ func (c *BaseFile) CheckFiles(url string, fileDir string) ([]map[string]string, 
 	s := strings.Split(url, "/")
 	fileName := s[len(s)-1]
 	cmds := []string{}
-	cmds = append(cmds, fmt.Sprintf("cd %s ", fileDir))
-	cmds = append(cmds, fmt.Sprintf("test -f /usr/bin/md5sum && md5sum %s ", fileName))
+	cmds = append(cmds, fmt.Sprintf("cd %s ", common.ShellQuote(fileDir)))
+	cmds = append(cmds, fmt.Sprintf("test -f /usr/bin/md5sum && md5sum %s ", common.ShellQuote(fileName)))
 	cmd := strings.Join(cmds, "&&")
 	ss, err := c.baseComponents.runLocalCommand(cmd)
 	if err != nil {

@@ -2,8 +2,8 @@ package confcontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func Lock(c echo.Context) error {
@@ -11,14 +11,14 @@ func Lock(c echo.Context) error {
 	if ctx.User == nil || ctx.User.Id == 0 {
 		return ctx.SetJson(2, nil, "not login")
 	}
-	projectId, _ := ctx.GetInt("projectId", 0)
+	// ctx.Project 只在当前用户有权限时才会被加载
+	if ctx.Project == nil || ctx.Project.Id == 0 {
+		return ctx.SetJson(1, nil, "项目不存在或无权限")
+	}
 	// 1为锁定 0为解锁
 	act, _ := ctx.GetInt("act", 0)
 
-	project, err := models.GetProjectById(projectId)
-	if err != nil {
-		return ctx.SetJson(1, nil, err.Error())
-	}
+	project := ctx.Project
 
 	if act == 1 {
 		project.UserLock = int(ctx.User.Id)
@@ -26,7 +26,7 @@ func Lock(c echo.Context) error {
 		project.UserLock = 0
 	}
 
-	err = models.UpdateProjectById(project)
+	err := models.UpdateProjectById(project)
 	if err != nil {
 		return ctx.SetJson(1, nil, err.Error())
 	}

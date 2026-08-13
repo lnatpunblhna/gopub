@@ -12,12 +12,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/db"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/library/p2p/init_sever"
-	"github.com/linclin/gopub/src/models"
-	"github.com/linclin/gopub/src/routers"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/p2p/init_sever"
+	"github.com/lnatpunblhna/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/routers"
+	"github.com/lnatpunblhna/gopub/src/tasks"
 )
 
 func initArgs() {
@@ -61,6 +62,11 @@ func init() {
 		logger.Error("数据库连接错误:", err)
 		os.Exit(2)
 	}
+	// 老部署直接换二进制时 Syncdb 不会执行，这里补齐登录凭据的过期时间列
+	models.MigrateAuthKeyColumn()
+	// 同理补齐 record 表的 scope / project_id 列与查询索引，
+	// 缺索引会让上线进度页每次轮询都全表扫描
+	models.MigrateRecordSchema()
 }
 
 // tplRenderer 渲染 views 目录下的模板，替代 beego 的模板自动渲染
@@ -123,6 +129,8 @@ func main() {
 	if config.RunMode() != "docker" {
 		init_sever.Start()
 	}
+	// 上线日志按保留天数定期清理，否则 record 表只会一直涨
+	tasks.StartRecordCleaner()
 
 	addr := config.DefaultString("HttpAddr", "0.0.0.0") + ":" + config.DefaultString("httpport", "8080")
 	//热启动

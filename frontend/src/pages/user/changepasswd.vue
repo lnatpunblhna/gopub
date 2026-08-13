@@ -17,7 +17,7 @@
                     </el-form-item>
 
                     <el-form-item prop="old_password" class="login-itema">
-                    <label >花名.实名 ：</label> <span v-text="userinfo.realname">  </span>    
+                    <label >花名.实名 ：</label> <span v-text="userinfo.realname">  </span>
                     </el-form-item>
 
                     <el-form-item prop="newpassword" class="login-itema">
@@ -41,6 +41,7 @@
 <script type="text/javascript">
     import {port_user} from 'common/port_uri'
     import store from 'store'
+    import {SET_USER_INFO} from 'store/actions/type'
 
 
     export default{
@@ -84,14 +85,21 @@
         },
         //提交
         submit_form() {
+            //服务端改密码后会吊销该用户的登录凭据，改的是自己的密码就必须重新登录
+            const is_self = String(store.state.user_info.user.Id) === String(this.uid)
              this.$http.post(port_user.changepasswd,this.form)
                     .then(({data: {msg}}) => {
                 this.$message({
-                message: msg,
+                message: is_self ? '密码已修改，请重新登录' : msg,
                 type: 'success'
             })
             setTimeout(() => {
-            this.$router.push({path: '/'})
+                if (is_self) {
+                    store.dispatch(SET_USER_INFO, null)
+                    this.$router.replace({name: 'login'})
+                    return
+                }
+                this.$router.push({path: '/'})
                 },
                     500
                 )
@@ -105,7 +113,7 @@
         position: relative;
         width: 100%;
         margin: 0 auto;
-        
+
         .loginWarpa {
             width: min(100%, 520px);
             padding: 28px;

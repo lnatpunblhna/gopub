@@ -126,17 +126,8 @@ function init() {
    ./$BASENAME -syncdb
    #go run main.go
 }
-function beerun() {
-   cd $DIR/src/
-   bee run 
-}
-
 function tailf() {
    tail -f $logfile
-}
-function docs() {
-   cd $DIR/src/ 
-   bee generate docs 
 }
 
 function sslkey() {
@@ -178,12 +169,8 @@ elif [ "$1" == "rundocker" ];then
     rundocker
 elif [ "$1" == "init" ];then
     init
-elif [ "$1" == "beerun" ];then
-    beerun 
 elif [ "$1" == "tail" ];then
     tailf
-elif [ "$1" == "docs" ];then
-    docs 
 elif [ "$1" == "sslkey" ];then
     sslkey
 else

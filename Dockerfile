@@ -20,8 +20,9 @@ ADD frontend/package.json frontend/package-lock.json /data/gopub/frontend/
 WORKDIR /data/gopub/frontend
 RUN npm ci
 ADD frontend/ /data/gopub/frontend/
+# src/views 需预先存在:vite 插件用 copyFileSync 写 index.tpl,不会自动建父目录
+# src/static 不用 ADD:vite 的 outDir 会自己创建(该目录已不入 git)
 ADD src/views /data/gopub/src/views
-ADD src/static /data/gopub/src/static
 RUN npm run build
 
 FROM alpine:3.22

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/linclin/gopub/src/library/db"
+	"github.com/lnatpunblhna/gopub/src/library/db"
 )
 
 const RELEASE_TYPE_SOFTLINK = 0

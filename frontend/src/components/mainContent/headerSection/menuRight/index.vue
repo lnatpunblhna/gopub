@@ -106,15 +106,19 @@
                                 this.finish_logout(msg)
                             })
                             .catch(() => {
-                                this.finish_logout('已退出登录')
+                                // 服务端吊销失败(已由拦截器提示原因)时仍清掉本地凭据，
+                                // 不再叠加一条成功提示
+                                this.finish_logout()
                             })
                 }).catch(() => {})
             },
             finish_logout(message){
-                this.$message({
-                    message,
-                    type: 'success'
-                })
+                if (message) {
+                    this.$message({
+                        message,
+                        type: 'success'
+                    })
+                }
                 this.set_user_info(null)
                 setTimeout(() => {
                     this.$router.replace({name: "login"})

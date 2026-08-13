@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cucued/sshexec"
 	"github.com/linclin/grpool"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -30,8 +29,8 @@ type RemoteAgent struct {
 	Algorithm SSHAlgorithm
 }
 
-func (s *RemoteAgent) SshHostByKey(hosts []string, port int, user string, cmd string) ([]sshexec.ExecResult, error) {
-	return s.runHosts(hosts, func(id int, host string, auths []ssh.AuthMethod) sshexec.ExecResult {
+func (s *RemoteAgent) SshHostByKey(hosts []string, port int, user string, cmd string) ([]ExecResult, error) {
+	return s.runHosts(hosts, func(id int, host string, auths []ssh.AuthMethod) ExecResult {
 		session := &remoteSession{
 			username:  user,
 			hostname:  host,
@@ -43,8 +42,8 @@ func (s *RemoteAgent) SshHostByKey(hosts []string, port int, user string, cmd st
 	}, cmd, "", "")
 }
 
-func (s *RemoteAgent) SftpHostByKey(hosts []string, port int, user string, localFilePath string, remoteFilePath string) ([]sshexec.ExecResult, error) {
-	return s.runHosts(hosts, func(id int, host string, auths []ssh.AuthMethod) sshexec.ExecResult {
+func (s *RemoteAgent) SftpHostByKey(hosts []string, port int, user string, localFilePath string, remoteFilePath string) ([]ExecResult, error) {
+	return s.runHosts(hosts, func(id int, host string, auths []ssh.AuthMethod) ExecResult {
 		session := &remoteSession{
 			username:  user,
 			hostname:  host,
@@ -56,7 +55,7 @@ func (s *RemoteAgent) SftpHostByKey(hosts []string, port int, user string, local
 	}, "", localFilePath, remoteFilePath)
 }
 
-func (s *RemoteAgent) runHosts(hosts []string, run func(int, string, []ssh.AuthMethod) sshexec.ExecResult, cmd string, localFilePath string, remoteFilePath string) ([]sshexec.ExecResult, error) {
+func (s *RemoteAgent) runHosts(hosts []string, run func(int, string, []ssh.AuthMethod) ExecResult, cmd string, localFilePath string, remoteFilePath string) ([]ExecResult, error) {
 	if len(hosts) == 0 {
 		log.Println("no hosts")
 		return nil, errors.New("no hosts")
@@ -86,7 +85,7 @@ func (s *RemoteAgent) runHosts(hosts []string, run func(int, string, []ssh.AuthM
 	}
 
 	pool.WaitAll()
-	returnResult := make([]sshexec.ExecResult, len(hosts))
+	returnResult := make([]ExecResult, len(hosts))
 	errorText := ""
 	for res := range pool.Jobresult {
 		jobId, _ := res.Jobid.(int)
@@ -96,11 +95,14 @@ func (s *RemoteAgent) runHosts(hosts []string, run func(int, string, []ssh.AuthM
 			returnResult[jobId].Command = cmd
 			returnResult[jobId].LocalFilePath = localFilePath
 			returnResult[jobId].RemoteFilePath = remoteFilePath
-			returnResult[jobId].Error = errors.New("ssh time out")
+			// 超时的这条同样要有起始时间：入库时 created_at 取的就是它，
+			// 零值会被算成 -62135596800，导致这条记录在按时间过滤的页面上永远不出现
+			returnResult[jobId].StartTime = time.Now()
+			returnResult[jobId].fail(errors.New("ssh time out"))
 			errorText += "the host " + hosts[jobId] + " command exec time out."
 			continue
 		}
-		execResult, _ := res.Result.(sshexec.ExecResult)
+		execResult, _ := res.Result.(ExecResult)
 		returnResult[jobId] = execResult
 		if execResult.Error != nil {
 			errorText += "the host " + execResult.Host + " command exec error.\n" + "result info :" + execResult.Result + ".\nerror info :" + execResult.Error.Error()
@@ -120,8 +122,8 @@ type remoteSession struct {
 	algorithm SSHAlgorithm
 }
 
-func (s *remoteSession) exec(id int, command string) sshexec.ExecResult {
-	result := sshexec.ExecResult{
+func (s *remoteSession) exec(id int, command string) ExecResult {
+	result := ExecResult{
 		Id:        id,
 		Host:      s.hostname,
 		Command:   command,
@@ -129,14 +131,14 @@ func (s *remoteSession) exec(id int, command string) sshexec.ExecResult {
 	}
 	client, err := s.client()
 	if err != nil {
-		result.Error = err
+		result.fail(err)
 		return result
 	}
 	defer client.Close()
 
 	session, err := client.NewSession()
 	if err != nil {
-		result.Error = err
+		result.fail(err)
 		return result
 	}
 	defer session.Close()
@@ -145,9 +147,14 @@ func (s *remoteSession) exec(id int, command string) sshexec.ExecResult {
 	var stderr bytes.Buffer
 	session.Stdout = &stdout
 	session.Stderr = &stderr
-	if err := session.Run(command); err != nil {
-		result.Error = err
+	runErr := session.Run(command)
+	// stdout / stderr 都要留下：脚本把报错打到 stdout 是常态，
+	// 只保留一路会让排查失去关键上下文
+	result.Stdout = stdout.String()
+	result.Stderr = stderr.String()
+	if runErr != nil {
 		result.Result = stderr.String()
+		result.fail(runErr)
 		return result
 	}
 	result.Result = stdout.String()
@@ -155,8 +162,8 @@ func (s *remoteSession) exec(id int, command string) sshexec.ExecResult {
 	return result
 }
 
-func (s *remoteSession) transfer(id int, localFilePath string, remoteFilePath string) sshexec.ExecResult {
-	result := sshexec.ExecResult{
+func (s *remoteSession) transfer(id int, localFilePath string, remoteFilePath string) ExecResult {
+	result := ExecResult{
 		Id:             id,
 		Host:           s.hostname,
 		LocalFilePath:  localFilePath,
@@ -165,45 +172,45 @@ func (s *remoteSession) transfer(id int, localFilePath string, remoteFilePath st
 	}
 	client, err := s.client()
 	if err != nil {
-		result.Error = err
+		result.fail(err)
 		return result
 	}
 	defer client.Close()
 
 	srcFile, err := os.Open(localFilePath)
 	if err != nil {
-		result.Error = err
+		result.fail(err)
 		return result
 	}
 	defer srcFile.Close()
 
 	fileInfo, err := srcFile.Stat()
 	if err != nil {
-		result.Error = err
+		result.fail(err)
 		return result
 	}
 
 	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
-		result.Error = err
+		result.fail(err)
 		return result
 	}
 	defer sftpClient.Close()
 
 	dstFile, err := sftpClient.Create(remoteFilePath)
 	if err != nil {
-		result.Error = err
+		result.fail(err)
 		return result
 	}
 	defer dstFile.Close()
 
 	n, err := io.Copy(dstFile, io.LimitReader(srcFile, fileInfo.Size()))
 	if err != nil {
-		result.Error = err
+		result.fail(err)
 		return result
 	}
 	if n != fileInfo.Size() {
-		result.Error = fmt.Errorf("copy: expected %v bytes, got %d", fileInfo.Size(), n)
+		result.fail(fmt.Errorf("copy: expected %v bytes, got %d", fileInfo.Size(), n))
 		return result
 	}
 	result.EndTime = time.Now()

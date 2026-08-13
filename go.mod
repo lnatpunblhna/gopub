@@ -1,14 +1,13 @@
-module github.com/linclin/gopub
+module github.com/lnatpunblhna/gopub
 
 go 1.25.0
 
 require (
 	github.com/bndr/gojenkins v1.2.0
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575
-	github.com/cucued/sshexec v0.0.0-20200228123807-89cda2655e44
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-ldap/ldap/v3 v3.4.14
 	github.com/go-sql-driver/mysql v1.10.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/labstack/echo/v4 v4.15.4
 	github.com/linclin/grpool v0.0.0-20170608104027-1e728f61a9da

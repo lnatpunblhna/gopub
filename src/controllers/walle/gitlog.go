@@ -2,9 +2,9 @@ package wallecontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func Gitlog(c echo.Context) error {
@@ -14,7 +14,9 @@ func Gitlog(c echo.Context) error {
 	}
 	s := components.BaseComponents{}
 	s.SetProject(ctx.Project)
-	s.SetTask(&models.Task{Id: -3})
+	s.SetTask(&models.Task{})
+	s.SetScope(models.RecordScopeGitPull)
+	s.SetOperatorFromUser(ctx.User)
 	err := s.GetGitLog()
 	if err != nil {
 		return ctx.SetJson(1, nil, "获取GitLog错误—"+err.Error())

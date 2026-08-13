@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/library/common"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/library/common"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
 )
 
 // appIdKey 是 JWT 签发方（appid）在请求上下文中的键。
@@ -48,7 +48,7 @@ func ApiAuth(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			return []byte(config.String("SecretKey")), nil
-		})
+		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 		// 原实现在 claims 断言失败时会放行请求，这里统一按验证失败处理
 		if err != nil {
 			return c.JSON(http.StatusOK, map[string]string{"errcode": "103", "errmsg": "token验证失败"})

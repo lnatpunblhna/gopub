@@ -2,11 +2,11 @@ package p2pcontrollers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/linclin/gopub/src/controllers"
-	"github.com/linclin/gopub/src/library/components"
-	"github.com/linclin/gopub/src/library/config"
-	"github.com/linclin/gopub/src/library/logger"
-	"github.com/linclin/gopub/src/models"
+	"github.com/lnatpunblhna/gopub/src/controllers"
+	"github.com/lnatpunblhna/gopub/src/library/components"
+	"github.com/lnatpunblhna/gopub/src/library/config"
+	"github.com/lnatpunblhna/gopub/src/library/logger"
+	"github.com/lnatpunblhna/gopub/src/models"
 )
 
 func SendAgent(c echo.Context) error {
@@ -17,7 +17,10 @@ func SendAgent(c echo.Context) error {
 
 	s := components.BaseComponents{}
 	s.SetProject(ctx.Project)
-	s.SetTask(&models.Task{Id: -3})
+	s.SetTask(&models.Task{})
+	// 原来和 gitpull 共用 -3 这个占位 id，两类操作的日志混在一起
+	s.SetScope(models.RecordScopeAgent)
+	s.SetOperatorFromUser(ctx.User)
 	agentDir := config.String("AgentDir")
 	AgentDestDir := config.String("AgentDestDir")
 	err := s.SendP2pAgent(agentDir, AgentDestDir)

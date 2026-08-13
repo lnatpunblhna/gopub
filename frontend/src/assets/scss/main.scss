@@ -1,19 +1,18 @@
 @charset "utf-8";
 
 //reset
-@import "./components/_reset";
+@use "./components/reset";
 //base
-@import "./components/_base";
+@use "./components/base";
 //animation
-@import "./components/_animation";
+@use "./components/animation";
 //start_loading
-@import "./components/_start_loading";
+@use "./components/start_loading";
 //dialog
-@import "./components/_dialog";
+@use "./components/dialog";
 //scroll
-@import "./components/_scroll-bar";
+@use "./components/scroll-bar";
 //Layout 布局
-@import "./components/_layout";
+@use "./components/layout";
 //素材布局
-@import "./components/_media";
-
+@use "./components/media";

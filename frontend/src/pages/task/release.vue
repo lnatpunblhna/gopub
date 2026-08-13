@@ -91,7 +91,26 @@
                     </el-table>    
                 </el-tab-pane>
                 <el-tab-pane label="上线进度"  name="publishProcess">
-                    <terminal :taskId="task.Id"></terminal>
+                    <terminal ref="terminal" :taskId="task.Id"></terminal>
+                </el-tab-pane>
+                <el-tab-pane label="错误记录" name="errLog">
+                    <el-table
+                            :data="errLogs"
+                            v-loading="load_errlog"
+                            border
+                            empty-text="暂无失败记录"
+                            style="width: 100%;">
+                        <el-table-column
+                                prop="create_time"
+                                label="时间"
+                                width="180">
+                        </el-table-column>
+                        <el-table-column label="失败原因">
+                            <template #default="scope">
+                                <pre class="errlog-text">{{ scope.row.err_info }}</pre>
+                            </template>
+                        </el-table-column>
+                    </el-table>
                 </el-tab-pane>
             </el-tabs>
 
@@ -110,6 +129,8 @@
                 task: {},
                 project: {},
                 changes: [],
+                errLogs: [],
+                load_errlog: false,
                 activeName:"verLog",
                 ips:[],
                 groups:[],
@@ -240,6 +261,32 @@
                 this.load_data = false
                 })       
             },
+            // 模板上一直绑着 @tab-click 却没有实现，切到错误记录时按需加载
+            handleClick(tab){
+                const name = tab && tab.props ? tab.props.name : this.activeName
+                if (name === "errLog") {
+                    this.get_errlog()
+                }
+            },
+            get_errlog(){
+                if (!this.route_id) {
+                    return
+                }
+                this.load_errlog = true
+                this.$http.get(port_task.errlog, {
+                            params: {
+                                taskId: this.route_id
+                            }
+                        })
+                        .then(({data: {data}}) => {
+                    this.errLogs = data || []
+                this.load_errlog = false
+            })
+            .
+                catch(() => {
+                    this.load_errlog = false
+            })
+            },
             //提交
             on_submit_form(){
                 this.on_submit_loading = true
@@ -255,6 +302,10 @@
                 })
                 this.activeName = "publishProcess"
                 this.on_submit_loading = false
+                // 历史日志不再被删除，改用后端返回的批次号跟踪这一轮
+                if (this.$refs.terminal) {
+                    this.$refs.terminal.reset(data && data.attempt ? data.attempt : 0)
+                }
             })
             .
                 catch(() => {
@@ -268,3 +319,13 @@
         }
     }
 </script>
+<style scoped>
+    .errlog-text {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+        font-family: Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+</style>
