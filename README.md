@@ -51,8 +51,8 @@ npm run build
 # 返回仓库根目录，配置数据库
 cp src/conf/app.conf src/conf/app.local.conf
 
-# 编译后端
-./control build
+# 前端 + 后端一起构建（clone 后首次运行请用这个）
+./control buildall
 
 # 初始化数据库
 ./control init
@@ -60,6 +60,9 @@ cp src/conf/app.conf src/conf/app.local.conf
 # 启动服务
 ./control start
 ```
+
+> `src/static` 与 `src/views/index.tpl` 是 Vite 构建产物，不纳入版本管理。因此**首次 clone 后必须先构建前端**，否则页面为空白。
+> 后续只改后端时可用 `./control build`（仅编译 Go），只改前端时可用 `./control webbuild`（仅构建前端）。
 
 默认访问地址为 `http://127.0.0.1:8192`。初始化账号通常为 `admin / 123456`，以实际数据库初始化逻辑为准。
 

@@ -23,14 +23,28 @@ logfile=$DIR/src/logs/stdout.log
 
 function build() {
     gofmt -w $DIR/src/
-    cd $DIR/src/ 
+    cd $DIR/src/
     go build -o $BASENAME
     if [ $? -ne 0 ]; then
         exit $?
     fi
 }
-function pack() {
+# 前端构建，产物写入 src/static 并刷新 src/views/index.tpl
+# 注意：不要把它并入 build()，Dockerfile 的 golang 阶段会执行 ./control build，那里没有 node
+function webbuild() {
+    cd $DIR/frontend
+    if [ ! -d node_modules ]; then
+        npm ci
+    fi
+    npm run build
+}
+# 前端 + 后端完整构建，源码 clone 后首次运行请用这个
+function buildall() {
+    webbuild
     build
+}
+function pack() {
+    buildall
     cd  ..
     rm  -rf $BASENAME/src/logs/*
     cd  .. && tar zcvf $app.tar.gz $BASENAME/control $BASENAME/$app.service $BASENAME/src/$app  $BASENAME/src/conf    $BASENAME/src/logs   $BASENAME/src/agent  $BASENAME/src/views $BASENAME/src/static  $BASENAME/src/favicon.ico
@@ -134,12 +148,16 @@ function sslkey() {
 
  
 function help() {
-    echo "$0 build|start|stop|kill|restart|reload|run|rundocker|init|tail|docs|pack|beerun|sslkey"
+    echo "$0 build|webbuild|buildall|pack|start|stop|kill|restart|reload|status|run|rundocker|init|tail|docs|beerun|sslkey"
 }
 if [ "$1" == "" ]; then
     help
 elif [ "$1" == "build" ];then
     build
+elif [ "$1" == "webbuild" ];then
+    webbuild
+elif [ "$1" == "buildall" ];then
+    buildall
 elif [ "$1" == "pack" ];then
     pack
 elif [ "$1" == "start" ];then
