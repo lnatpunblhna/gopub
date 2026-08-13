@@ -1,6 +1,7 @@
 package components
 
 import (
+	"errors"
 	"fmt"
 	"github.com/lnatpunblhna/gopub/src/library/common"
 	"os"
@@ -70,6 +71,69 @@ func (c *BaseGit) syncRepoForRead(gitDir string) error {
 func (c *BaseGit) SetBaseComponents(b BaseComponents) {
 	c.baseComponents = b
 }
+
+/**
+ * 解析远程默认分支的具体名字(master / main 自适应)
+ *
+ * 早先这一步是内联进 && 链的 BR=$(git remote show origin | sed -n 's/.*HEAD branch: //p'),
+ * 有两个坑叠在一起:
+ *   - 管道的退出码取自最后一环 sed,而 sed -n 匹配不到任何行时照样返回 0,
+ *     所以 git remote show origin 失败(远程不可达 / 认证失败)会被完全吞掉;
+ *   - git 那行输出是可本地化的,非英文 locale 下 "HEAD branch:" 会被翻译,sed 同样匹配不到。
+ * 两种情况都得到空 BR,再拼进 git checkout -q "$BR" 就是
+ * fatal: empty string is not a valid pathspec(exit 128),而且完全看不出真正的原因。
+ *
+ * 现在优先读本地 ref:clone 时就已写好,不联网、不受 locale 影响;
+ * 拿不到才回退去问一次远程,并且空结果一律当错误上报。
+ */
+func (c *BaseGit) resolveBranch(branch string, gitDir string) (string, error) {
+	if branch != "" {
+		return branch, nil
+	}
+	cdCmd := fmt.Sprintf("cd %s ", common.ShellQuote(gitDir))
+	detected := ""
+	// symbolic-ref 直接读 refs/remotes/origin/HEAD,输出形如 origin/master
+	cmd := strings.Join([]string{cdCmd, `/usr/bin/env git symbolic-ref -q --short refs/remotes/origin/HEAD`}, " && ")
+	if s, err := c.baseComponents.runLocalCommand(cmd); err == nil {
+		detected = strings.TrimPrefix(strings.TrimSpace(s.Result), "origin/")
+	}
+	if detected == "" {
+		// 老仓库可能没写 origin/HEAD,问一次远程兜底。
+		// LC_ALL=C 固定英文输出,且这里不接管道,git 自己的失败能如实反映到退出码上。
+		cmd = strings.Join([]string{cdCmd, `LC_ALL=C /usr/bin/env git remote show origin`}, " && ")
+		s, err := c.baseComponents.runLocalCommand(cmd)
+		if err != nil {
+			return "", fmt.Errorf("探测远程默认分支失败,请检查仓库地址与访问权限,或在上线单里显式指定分支: %w", err)
+		}
+		detected = parseRemoteHeadBranch(s.Result)
+	}
+	if detected == "" {
+		return "", errors.New("探测不到远程默认分支,请在上线单里显式指定分支")
+	}
+	// 分支名来自命令输出,仍然过一遍校验再拼进后续命令
+	if err := common.ValidGitRef(detected); err != nil {
+		return "", fmt.Errorf("探测到的默认分支不合法(%s): %w", detected, err)
+	}
+	return detected, nil
+}
+
+// parseRemoteHeadBranch 从 git remote show origin 的输出里取 HEAD branch 那一行。
+// 远程没设置 HEAD 时 git 会打印 (unknown),那不是分支名,按探测失败处理。
+func parseRemoteHeadBranch(out string) string {
+	for _, line := range strings.Split(out, "\n") {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "HEAD branch:")
+		if !ok {
+			continue
+		}
+		rest = strings.TrimSpace(rest)
+		if rest == "(unknown)" {
+			return ""
+		}
+		return rest
+	}
+	return ""
+}
+
 func (c *BaseGit) UpdateRepo(branch string, gitDir string) error {
 	if gitDir == "" {
 		gitDir = c.baseComponents.GetDeployFromDir()
@@ -77,36 +141,44 @@ func (c *BaseGit) UpdateRepo(branch string, gitDir string) error {
 	if err := common.ValidGitRef(branch); err != nil {
 		return err
 	}
-	// 分支为空时自动探测远程默认分支(master / main 自适应),不再写死 master。
-	// 这一支是有意保留的命令替换,不能引用;非空分支一律走 ShellQuote,
-	// 否则 BR=<分支> 这个赋值语句本身就会被注入(校验之外的第二道防线)。
-	branchExpr := common.ShellQuote(branch)
-	if branch == "" {
-		branchExpr = "$(git remote show origin | sed -n 's/.*HEAD branch: //p')"
-	}
 	dotGit := strings.TrimRight(gitDir, "/") + "/.git"
 	if _, err := os.Stat(dotGit); err != nil {
-		if os.IsNotExist(err) {
-			cmds := []string{}
-			cmds = append(cmds, fmt.Sprintf("mkdir -p %s ", common.ShellQuote(gitDir)))
-			cmds = append(cmds, fmt.Sprintf("cd %s ", common.ShellQuote(gitDir)))
-			cmds = append(cmds, fmt.Sprintf("/usr/bin/env git clone -q %s .", common.ShellQuote(c.baseComponents.project.RepoUrl)))
-			cmds = append(cmds, fmt.Sprintf("BR=%s ", branchExpr))
-			cmds = append(cmds, `/usr/bin/env git checkout -q "$BR"`)
-			cmd := strings.Join(cmds, " && ")
-			_, err := c.baseComponents.runLocalCommand(cmd)
+		// 只有"确实不存在"才该走 clone;其它错误(如权限)原先会穿透到下面的 fetch,
+		// 报出来的是 cd 失败,掩盖真正的原因
+		if !os.IsNotExist(err) {
 			return err
 		}
+		cmds := []string{}
+		cmds = append(cmds, fmt.Sprintf("mkdir -p %s ", common.ShellQuote(gitDir)))
+		cmds = append(cmds, fmt.Sprintf("cd %s ", common.ShellQuote(gitDir)))
+		cmds = append(cmds, fmt.Sprintf("/usr/bin/env git clone -q %s .", common.ShellQuote(c.baseComponents.project.RepoUrl)))
+		// clone 完成时工作区已经在远程默认分支上,分支为空就不必再 checkout,
+		// 也就不需要再去探测默认分支名;只有显式指定了分支才切一次
+		if branch != "" {
+			cmds = append(cmds, fmt.Sprintf("/usr/bin/env git checkout -q %s", common.ShellQuote(branch)))
+		}
+		cmd := strings.Join(cmds, " && ")
+		_, err := c.baseComponents.runLocalCommand(cmd)
+		return err
 	}
-	// 用 fetch + reset 强制对齐远程分支,避开 pull 的 merge/tracking 配置
+	// 仓库已存在:先 fetch,再把空分支解析成具体名字,最后 checkout + reset 强制对齐远程,
+	// 避开 pull 的 merge/tracking 配置
 	cmds := []string{}
 	cmds = append(cmds, fmt.Sprintf("cd %s ", common.ShellQuote(gitDir)))
 	cmds = append(cmds, "/usr/bin/env git fetch -q --all")
-	cmds = append(cmds, fmt.Sprintf("BR=%s ", branchExpr))
-	cmds = append(cmds, `/usr/bin/env git checkout -q "$BR"`)
-	cmds = append(cmds, `/usr/bin/env git reset -q --hard "origin/$BR"`)
+	if _, err := c.baseComponents.runLocalCommand(strings.Join(cmds, " && ")); err != nil {
+		return err
+	}
+	targetBranch, err := c.resolveBranch(branch, gitDir)
+	if err != nil {
+		return err
+	}
+	cmds = []string{}
+	cmds = append(cmds, fmt.Sprintf("cd %s ", common.ShellQuote(gitDir)))
+	cmds = append(cmds, fmt.Sprintf("/usr/bin/env git checkout -q %s", common.ShellQuote(targetBranch)))
+	cmds = append(cmds, fmt.Sprintf("/usr/bin/env git reset -q --hard %s", common.ShellQuote("origin/"+targetBranch)))
 	cmd := strings.Join(cmds, " && ")
-	_, err := c.baseComponents.runLocalCommand(cmd)
+	_, err = c.baseComponents.runLocalCommand(cmd)
 	return err
 
 }
@@ -257,22 +329,33 @@ func (c *BaseGit) GetLastModifyInfo(branch string, filepath string) (map[string]
 	if err := common.ValidGitRef(branch); err != nil {
 		return nil, err
 	}
+	// 空 filepath 引用出来是 '',那就是个空 pathspec,git 直接 fatal
+	if filepath == "" {
+		return nil, errors.New("文件路径为空")
+	}
 	// filepath 来自 git diff 的输出,仓库里完全可以存在带特殊字符的文件名,同样要引用
 	destination := c.baseComponents.GetDeployFromDir()
-	// branch 为空时不能引用成 '' ——那会变成一个空 pathspec,git 直接报错
-	pathspec := common.ShellQuote(filepath)
+	// 分支要放在 -- 前面:-- 之后的参数一律按 pathspec 解析,
+	// 原先拼成 git log -- <branch> <filepath>,branch 被当成了一个匹配不到的路径,完全没生效
+	gitLog := `/usr/bin/env git log `
 	if branch != "" {
-		pathspec = common.ShellQuote(branch) + " " + pathspec
+		gitLog += common.ShellQuote(branch) + " "
 	}
+	gitLog += `-- ` + common.ShellQuote(filepath) + ` | head -3 | tail -2`
 	cmds := []string{}
 	cmds = append(cmds, fmt.Sprintf("cd %s ", common.ShellQuote(destination)))
-	cmds = append(cmds, `/usr/bin/env git log -- `+pathspec+` | head -3 | tail -2`)
+	cmds = append(cmds, gitLog)
 	cmd := strings.Join(cmds, " && ")
 	s, err := c.baseComponents.runLocalCommand(cmd)
 	if err != nil {
 		return nil, err
 	} else {
 		lines := strings.Split(s.Result, "\n")
+		// pathspec 匹配不到提交时 git log 输出为空但退出码是 0,
+		// 此时 lines 只有一个空串,直接取 lines[1] 会 panic
+		if len(lines) < 2 {
+			return nil, errors.New("取不到 " + filepath + " 的最后修改信息")
+		}
 
 		name := common.SubString(lines[0], 8, 100)
 		time := common.SubString(lines[1], 8, 100)
