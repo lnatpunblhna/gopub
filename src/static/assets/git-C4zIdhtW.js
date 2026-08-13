@@ -1,1 +1,0 @@
-var e=`/api/get/git/branch`,t=`/api/get/git/tag`,n=`/api/get/git/commit`,r=`/api/get/git/gitlog`,i=`/api/get/git/gitpull`,a=`/api/get/jenkins/commit`;export{i as a,r as i,n,a as o,t as r,e as t};

@@ -303,3 +303,21 @@ __pycache__/
 
 # OpenCover UI analysis results
 OpenCover/
+
+# ================= gopub =================
+
+# 前端构建产物：由 frontend/vite.config.js 输出（outDir: ../src/static）
+# Dockerfile 的 node 阶段与 .github/workflows/release.yml 都会重新构建，无需入库
+/src/static/
+
+# 同上：vite closeBundle 钩子由 src/static/index.html 复制生成
+/src/views/index.tpl
+
+# 后端编译产物：control build 输出的二进制
+/src/gopub
+
+# 运行时文件：control start 写入的进程号
+/gopub.pid
+
+# macOS
+.DS_Store
