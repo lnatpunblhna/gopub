@@ -24,13 +24,16 @@ logfile=$DIR/src/logs/stdout.log
 function build() {
     gofmt -w $DIR/src/
     cd $DIR/src/
-    go build -o $BASENAME
+    # CGO_ENABLED=0 静态编译:本项目无 import "C",但只要构建机装了 gcc,cgo 就会默认开启,
+    # 届时标准库 net 走 cgo 版 DNS 解析器,产物动态链接构建机的 glibc。
+    # 在比构建机更老的目标机(如 glibc 2.28)上会直接报 GLIBC_2.xx not found。
+    CGO_ENABLED=0 go build -o $BASENAME
     if [ $? -ne 0 ]; then
         exit $?
     fi
     # p2p 分发 agent:产物已移出版本管理(见 .gitignore),干净 clone 后必须在这里构建出来,
     # 否则 control pack 和 Dockerfile 的 COPY src/agent 都会漏掉它,SendP2pAgent 失效。
-    # CGO_ENABLED=0 静态编译:它会被 sftp 送到发布目标机执行,目标机 glibc 版本未知。
+    # 同样静态编译:它会被 sftp 送到发布目标机执行,目标机 glibc 版本更加不可控。
     CGO_ENABLED=0 go build -o $DIR/src/agent/agent_main ./agent
     if [ $? -ne 0 ]; then
         exit $?
