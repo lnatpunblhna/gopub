@@ -317,6 +317,11 @@ OpenCover/
 # 后端编译产物：control build 输出的二进制
 /src/gopub
 
+# p2p agent 编译产物：由 release.yml 的 Build p2p agent 步骤静态编译后打进发布包
+# 源码为 src/agent/agent_main.go（sever_main.go 走 -tags agentserver），无需入库
+/src/agent/agent_main
+/src/agent/agent
+
 # 打包产物：control pack 与 release.yml 生成
 /*.tar.gz
 

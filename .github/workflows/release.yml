@@ -38,9 +38,42 @@ jobs:
           npm run build
 
       # 后端构建,产物为 src/gopub(等价于 control build)
+      # CGO_ENABLED=0 是关键:runner 装了 gcc,cgo 默认开启,此时标准库 net 会走
+      # cgo 版 DNS 解析器,产物动态链接 runner 的 glibc(ubuntu-24.04 为 2.39),
+      # 在 glibc 2.28 的老机器上会直接报 GLIBC_2.34 not found。
+      # 本项目无 import "C",关掉 cgo 即为纯静态,不依赖任何 libc 版本。
       - name: Build backend
         working-directory: src
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
         run: go build -trimpath -ldflags "-s -w" -o gopub .
+
+      # p2p 分发 agent:由 SendP2pAgent 经 sftp 送到发布目标机上执行,
+      # 同样要满足目标机的 glibc 约束。产物已移出版本管理,必须在这里构建出来
+      - name: Build p2p agent
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -trimpath -ldflags "-s -w" -o agent_main ./src/agent
+
+      # 兜底:任一二进制带上 INTERP 段或 NEEDED 依赖就说明没静态成,直接让流水线失败
+      - name: Verify static linking
+        run: |
+          for f in src/gopub agent_main; do
+            echo "--- $f"
+            file "$f"
+            if readelf -l "$f" | grep -q INTERP || readelf -d "$f" 2>/dev/null | grep -q NEEDED; then
+              echo "::error::$f 不是静态链接,glibc 2.28 的目标机无法运行"
+              exit 1
+            fi
+            if readelf -V "$f" 2>/dev/null | grep -q GLIBC_; then
+              echo "::error::$f 残留 GLIBC_ 版本符号"
+              exit 1
+            fi
+          done
 
       # 打包,制品清单与 control pack 保持一致,顶层目录名为 gopub
       - name: Package
@@ -55,11 +88,19 @@ jobs:
           cp src/gopub "$STAGE/src/"
           cp src/favicon.ico "$STAGE/src/"
           cp -r src/conf src/agent src/views src/static "$STAGE/src/"
-          tar -C "$(dirname "$STAGE")" -zcvf "gopub-${VERSION}.tar.gz" gopub
+          # agent_main 产物已移出版本管理,src/agent 里没有它,由上面的构建步骤提供
+          cp agent_main "$STAGE/src/agent/agent_main"
+          rm -f "$STAGE"/src/agent/*.go
+          chmod +x "$STAGE/control" "$STAGE/src/gopub" "$STAGE/src/agent/agent_main" "$STAGE/src/agent/control"
+          tar -C "$(dirname "$STAGE")" -zcf "gopub-${VERSION}.tar.gz" gopub
+          sha256sum "gopub-${VERSION}.tar.gz" > "gopub-${VERSION}.tar.gz.sha256"
+          cat "gopub-${VERSION}.tar.gz.sha256"
           echo "ARTIFACT=gopub-${VERSION}.tar.gz" >> "$GITHUB_ENV"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ARTIFACT }}
+          files: |
+            ${{ env.ARTIFACT }}
+            ${{ env.ARTIFACT }}.sha256
           generate_release_notes: true

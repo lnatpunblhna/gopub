@@ -28,6 +28,13 @@ function build() {
     if [ $? -ne 0 ]; then
         exit $?
     fi
+    # p2p 分发 agent:产物已移出版本管理(见 .gitignore),干净 clone 后必须在这里构建出来,
+    # 否则 control pack 和 Dockerfile 的 COPY src/agent 都会漏掉它,SendP2pAgent 失效。
+    # CGO_ENABLED=0 静态编译:它会被 sftp 送到发布目标机执行,目标机 glibc 版本未知。
+    CGO_ENABLED=0 go build -o $DIR/src/agent/agent_main ./agent
+    if [ $? -ne 0 ]; then
+        exit $?
+    fi
 }
 # 前端构建，产物写入 src/static 并刷新 src/views/index.tpl
 # 注意：不要把它并入 build()，Dockerfile 的 golang 阶段会执行 ./control build，那里没有 node
