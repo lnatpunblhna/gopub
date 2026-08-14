@@ -125,9 +125,6 @@
     pattern: /^\/task\/release\//,
     active: "/task/list"
   }, {
-    pattern: /^\/task\/searchrelease\//,
-    active: "/task/list"
-  }, {
     pattern: /^\/user\/changepasswd/,
     active: "/user/list"
   }]

@@ -28,8 +28,9 @@ const maskedMemo = `{"kind":"masked","success":true,"hosts":[]}`
 // 这类记录以前全堆在同一个 task_id 上，谁点的都能看到别人的输出；
 // 现在按 scope + 当前登录用户过滤，各看各的。
 //
-// 这个接口在免登录白名单里（支撑对外的发布看板页），
-// 未登录时会脱敏：只保留步骤名与成功 / 失败，不返回命令、路径和主机输出。
+// 接口本身已挂 RequireLogin，下面的脱敏分支正常走不到，
+// 保留作纵深防御：万一哪天又被放进免登录白名单，匿名请求也只拿得到
+// 步骤名与成功 / 失败，不会漏出命令、路径和主机输出。
 func List(c echo.Context) error {
 	ctx := controllers.New(c)
 	taskId, _ := ctx.GetInt64("taskId", 0)
@@ -85,7 +86,7 @@ func List(c echo.Context) error {
 }
 
 // Attempts 返回某个上线单的发布批次列表，供前端切换历史发布。
-// 只有批次号、时间与成败，不含命令与主机信息，因此与 List 一样允许未登录访问。
+// 只有批次号、时间与成败，不含命令与主机信息。
 func Attempts(c echo.Context) error {
 	ctx := controllers.New(c)
 	taskId, _ := ctx.GetInt64("taskId", 0)

@@ -40,9 +40,6 @@
                     <el-form-item class="login-item">
                         <el-button size="large" type="primary" class="form-submit" @click="submit_form">登录</el-button>
                     </el-form-item>
-                    <el-form-item class="login-item">
-                        <el-button size="large" class="form-query" @click="to_tasklist">上线单查询</el-button>
-                    </el-form-item>
                 </el-form>
             </div>
         </div>
@@ -104,9 +101,6 @@
                 }
             }
         )
-    },
-    to_tasklist(){
-          this.$router.push({path: '/task/searchlist'})
     }
     }
     }
@@ -255,14 +249,6 @@
                     background: var(--gp-primary-strong);
                 }
 
-            }
-
-            .form-query {
-                width: 100%;
-                color: var(--gp-primary-strong);
-                border-color: var(--gp-border);
-                background: #fff;
-                border-radius: 8px;
             }
         }
     }

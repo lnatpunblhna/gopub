@@ -37,10 +37,59 @@ func DB() *gorm.DB {
 	return gdb
 }
 
-// Init 建立数据库连接。dsn 不含 parseTime 时会自动补上：
+// 连接池默认值。与 README「连接池（默认 30 / 100）」一致。
+// database/sql 自身的默认值是 MaxIdleConns=2、MaxOpenConns=无限，
+// 前者会让连接用完即关（拿不到长连接复用的好处），后者在高并发时能打满
+// MySQL 的 max_connections，两个都不适合本服务，因此这里显式给默认值。
+const (
+	defaultMaxIdleConn = 30
+	defaultMaxOpenConn = 100
+	// 连接最长存活时间。设得比 MySQL/中间层的 wait_timeout 短，
+	// 让客户端主动淘汰连接，避免用到已被服务端单方面关闭的连接。
+	defaultConnMaxLifetime = time.Hour
+	// 空闲连接最长保留时间。比 lifetime 短，闲时能把池收缩回去，
+	// 又足够长到让连续操作复用同一条连接。
+	defaultConnMaxIdleTime = 10 * time.Minute
+)
+
+// PoolConfig 是连接池参数。零值字段一律回落到上面的默认值，
+// 因此调用方只需覆盖关心的项。
+type PoolConfig struct {
+	MaxIdleConn     int
+	MaxOpenConn     int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
+}
+
+// withDefaults 把零值字段补成默认值
+func (p PoolConfig) withDefaults() PoolConfig {
+	if p.MaxIdleConn <= 0 {
+		p.MaxIdleConn = defaultMaxIdleConn
+	}
+	if p.MaxOpenConn <= 0 {
+		p.MaxOpenConn = defaultMaxOpenConn
+	}
+	if p.ConnMaxLifetime <= 0 {
+		p.ConnMaxLifetime = defaultConnMaxLifetime
+	}
+	if p.ConnMaxIdleTime <= 0 {
+		p.ConnMaxIdleTime = defaultConnMaxIdleTime
+	}
+	// 空闲上限大于连接上限没有意义：database/sql 会把 MaxIdleConns
+	// 静默压到 MaxOpenConns，这里提前对齐，免得 Stats 看着对不上。
+	if p.MaxIdleConn > p.MaxOpenConn {
+		p.MaxIdleConn = p.MaxOpenConn
+	}
+	return p
+}
+
+// Init 建立数据库连接池。dsn 不含 parseTime 时会自动补上：
 // GORM 依赖 go-sql-driver 的 parseTime=true 才能把 DATETIME 扫描进 time.Time，
 // 而 beego orm 是自行转换的，原 DSN 里没有这个参数。
-func Init(dsn string, maxIdleConn, maxOpenConn int, debug bool) error {
+//
+// *gorm.DB 底层是 database/sql 的连接池，全局复用一个即可：连接在池中长期保持，
+// 每次查询借出、用完归还，不存在一次请求一次握手。
+func Init(dsn string, pool PoolConfig, debug bool) error {
 	level := gormlogger.Silent
 	if debug {
 		level = gormlogger.Info
@@ -61,20 +110,51 @@ func Init(dsn string, maxIdleConn, maxOpenConn int, debug bool) error {
 	if err != nil {
 		return err
 	}
-	if maxIdleConn > 0 {
-		sqlDB.SetMaxIdleConns(maxIdleConn)
+	pool = pool.withDefaults()
+	sqlDB.SetMaxIdleConns(pool.MaxIdleConn)
+	sqlDB.SetMaxOpenConns(pool.MaxOpenConn)
+	sqlDB.SetConnMaxLifetime(pool.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(pool.ConnMaxIdleTime)
+
+	if err := sqlDB.Ping(); err != nil {
+		return err
 	}
-	if maxOpenConn > 0 {
-		sqlDB.SetMaxOpenConns(maxOpenConn)
-	}
-	sqlDB.SetConnMaxLifetime(time.Hour)
-	return sqlDB.Ping()
+	logger.Info("数据库连接池就绪: 最大连接", pool.MaxOpenConn, "最大空闲", pool.MaxIdleConn,
+		"连接存活", pool.ConnMaxLifetime, "空闲存活", pool.ConnMaxIdleTime)
+	return nil
 }
 
-// BuildDSN 按原 beego 的连接串格式拼装 DSN，并补上 GORM 需要的 parseTime
+// Stats 返回连接池实时状态，用于排查连接不够用/泄漏。
+// 未初始化时返回零值。
+func Stats() sql.DBStats {
+	if gdb == nil {
+		return sql.DBStats{}
+	}
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return sql.DBStats{}
+	}
+	return sqlDB.Stats()
+}
+
+// Close 关闭连接池，供进程退出时调用
+func Close() error {
+	if gdb == nil {
+		return nil
+	}
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
+}
+
+// BuildDSN 按原 beego 的连接串格式拼装 DSN，并补上 GORM 需要的 parseTime。
+// timeout 只约束建立连接的握手阶段，不设 readTimeout/writeTimeout：
+// 上线记录等查询耗时不可控，读超时会把正常的慢查询误杀成连接错误。
 func BuildDSN(user, pass, host, port, name string) string {
 	return fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Asia%%2FShanghai",
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=true&loc=Asia%%2FShanghai&timeout=10s",
 		user, pass, host, port, name,
 	)
 }
@@ -102,6 +182,17 @@ func MySQLConfig() (user, pass, host, port, name string) {
 	return
 }
 
+// PoolConfigFromConfig 读取 conf/app.conf 里的连接池配置。
+// 键名以 db_ 为前缀，与 app.conf、README 保持一致；缺项走 PoolConfig 的默认值。
+func PoolConfigFromConfig() PoolConfig {
+	return PoolConfig{
+		MaxIdleConn:     config.DefaultInt("db_max_idle_conn", defaultMaxIdleConn),
+		MaxOpenConn:     config.DefaultInt("db_max_open_conn", defaultMaxOpenConn),
+		ConnMaxLifetime: time.Duration(config.DefaultInt("db_conn_max_lifetime", int(defaultConnMaxLifetime/time.Second))) * time.Second,
+		ConnMaxIdleTime: time.Duration(config.DefaultInt("db_conn_max_idle_time", int(defaultConnMaxIdleTime/time.Second))) * time.Second,
+	}
+}
+
 // InitFromConfig 依据 conf/app.conf 中的配置建立连接。
 // 幂等：docker 模式下建表流程与主流程都会调用，重复调用不会重建连接池。
 func InitFromConfig() error {
@@ -109,9 +200,7 @@ func InitFromConfig() error {
 		return nil
 	}
 	user, pass, host, port, name := MySQLConfig()
-	maxIdleConn, _ := config.Int("mysql_max_idle_conn")
-	maxOpenConn, _ := config.Int("mysql_max_open_conn")
-	return Init(BuildDSN(user, pass, host, port, name), maxIdleConn, maxOpenConn, config.RunMode() == "dev")
+	return Init(BuildDSN(user, pass, host, port, name), PoolConfigFromConfig(), config.RunMode() == "dev")
 }
 
 // mysqlDatetimeLayout 是 MySQL DATETIME 列的原始文本格式。

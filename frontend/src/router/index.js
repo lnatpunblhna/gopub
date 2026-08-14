@@ -1,10 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import store from 'store'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
 
 const leftSlide = () => import('components/leftSlide/index.vue')
-const leftSlideToLogin = () => import('components/leftSlideTologin/index.vue')
 
 const routes = [{
   path: '/home',
@@ -26,7 +26,8 @@ const routes = [{
   },
   meta: {
     title: '项目配置',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/conf/update/:id',
@@ -37,7 +38,8 @@ const routes = [{
   },
   meta: {
     title: '修改配置',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/conf/detection/:id',
@@ -48,7 +50,8 @@ const routes = [{
   },
   meta: {
     title: '检测项目',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/conf/add',
@@ -59,7 +62,8 @@ const routes = [{
   },
   meta: {
     title: '增加项目配置',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/task/list',
@@ -70,14 +74,8 @@ const routes = [{
   },
   meta: {
     title: '全部上线单',
-    auth: true
-  }
-}, {
-  path: '/task/searchlist',
-  name: 'searchtaskList',
-  components: {
-    default: () => import('pages/task/searchbase.vue'),
-    menuView: leftSlideToLogin
+    auth: true,
+    admin: true
   }
 }, {
   path: '/task/create',
@@ -96,17 +94,6 @@ const routes = [{
   components: {
     default: () => import('pages/task/release.vue'),
     menuView: leftSlide
-  },
-  meta: {
-    title: '部署上线',
-    auth: true
-  }
-}, {
-  path: '/task/searchrelease/:id',
-  name: 'searchtaskRelease',
-  components: {
-    default: () => import('pages/task/searchrelease.vue'),
-    menuView: leftSlideToLogin
   },
   meta: {
     title: '部署上线',
@@ -165,7 +152,8 @@ const routes = [{
   },
   meta: {
     title: 'agent状态查询',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/other/noauto',
@@ -176,7 +164,8 @@ const routes = [{
   },
   meta: {
     title: '预发布统计',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/other/flush',
@@ -187,7 +176,8 @@ const routes = [{
   },
   meta: {
     title: '刷新版本号',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/other/gitpull',
@@ -198,7 +188,8 @@ const routes = [{
   },
   meta: {
     title: '预发布git版本查看',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/user/login',
@@ -215,7 +206,8 @@ const routes = [{
   },
   meta: {
     title: '新增用户',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/user/changepasswd',
@@ -237,7 +229,8 @@ const routes = [{
   },
   meta: {
     title: '用户列表',
-    auth: true
+    auth: true,
+    admin: true
   }
 }, {
   path: '/',
@@ -261,19 +254,28 @@ const router = createRouter({
   }
 })
 
+// 管理员看得到「全部上线单」，普通用户只有「我的上线单」，
+// 登录后的落地页与登录态跳转都按这个区分
+function home_path(is_admin) {
+  return is_admin ? '/task/list' : '/task/mylist'
+}
+
 router.beforeEach((to, from, next) => {
   NProgress.start()
   const toName = to.name
   const isLogin = store.state.user_info.login
+  const user = store.state.user_info.user
+  const isAdmin = Number(user && user.Role) === 1
 
-  if (!isLogin && toName === 'searchtaskList') {
-    next()
-  } else if (!isLogin && toName === 'searchtaskRelease') {
-    next({})
-  } else if (!isLogin && toName !== 'login') {
+  if (!isLogin && toName !== 'login') {
     next({ name: 'login' })
   } else if (isLogin && toName === 'login') {
-    next({ path: '/task/list' })
+    next({ path: home_path(isAdmin) })
+  } else if (isLogin && to.meta && to.meta.admin && !isAdmin) {
+    // 菜单已按 adminOnly 隐藏了这些入口，这里再拦一道：
+    // 光隐藏菜单挡不住直接在地址栏敲 URL
+    ElMessage({ message: '无权访问该页面', type: 'warning' })
+    next({ path: home_path(isAdmin) })
   } else {
     next()
   }

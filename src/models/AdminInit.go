@@ -37,11 +37,13 @@ func Connect() {
 	}
 }
 
-// 创建数据库
+// 创建数据库。
+// 这里刻意不复用全局连接池：建库时目标库还不存在，DSN 不能带库名，
+// 用完即弃，因此把池压到 1 条连接。
 func createdb() error {
 	dbUser, dbPass, dbHost, dbPort, dbName := db.MySQLConfig()
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8", dbUser, dbPass, dbHost, dbPort)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/?charset=utf8&timeout=10s", dbUser, dbPass, dbHost, dbPort)
 	conn, err := sql.Open("mysql", dsn)
 	if err != nil {
 		logger.Error("数据库连接错误:", err)
@@ -49,6 +51,15 @@ func createdb() error {
 		return err
 	}
 	defer conn.Close()
+	conn.SetMaxOpenConns(1)
+	conn.SetMaxIdleConns(1)
+
+	// sql.Open 只解析 DSN 不建连，真正的连通性要靠 Ping 才能暴露出来
+	if err = conn.Ping(); err != nil {
+		logger.Error("数据库连接错误:", err)
+		os.Exit(2)
+		return err
+	}
 
 	sqlstring := fmt.Sprintf(" CREATE DATABASE if not exists `%s` CHARSET utf8 COLLATE utf8_general_ci", dbName)
 	r, err := conn.Exec(sqlstring)

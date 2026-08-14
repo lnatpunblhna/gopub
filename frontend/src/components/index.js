@@ -11,7 +11,7 @@
  *
  */
 
-// leftSlide/leftSlideTologin 只由 router/index.js 动态导入,不在此处静态汇总,
+// leftSlide 只由 router/index.js 动态导入,不在此处静态汇总,
 // 否则会被并入主 chunk 而失去按需加载。
 import mainContent from 'components/mainContent/index.vue'
 import panelTitle from 'components/panelTitle/index.vue'

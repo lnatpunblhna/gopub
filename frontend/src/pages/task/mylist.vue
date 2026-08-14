@@ -128,7 +128,6 @@
 <script type="text/javascript">
     import {panelTitle, bottomToolBar, search} from 'components'
     import {port_task} from 'common/port_uri'
-    import store from 'store'
     export default{
         data(){
             return {
@@ -173,14 +172,14 @@
             },
             //获取数据
             get_table_data(){
-                console.log(store.state.user_info.user.Id)
                 this.load_data = true
-                this.$http.get(port_task.list, {
+                // 不再把自己的 user.Id 当参数传上去：后端按登录态过滤，
+                // 否则改成别人的 ID 就能看别人的上线单
+                this.$http.get(port_task.mylist, {
                             params: {
                                 page: this.currentPage,
                                 length: this.length,
-                                select_info: this.select_info,
-                                my: store.state.user_info.user.Id
+                                select_info: this.select_info
                             }
                         })
                         .then(({data: {data}}) => {

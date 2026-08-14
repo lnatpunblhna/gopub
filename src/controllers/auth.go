@@ -55,13 +55,19 @@ func RequireAdmin(next echo.HandlerFunc) echo.HandlerFunc {
 		if !isLogin(user) {
 			return notLogin(c)
 		}
-		if user.Role != roleAdmin {
+		if !IsAdmin(user) {
 			return c.JSON(http.StatusOK, map[string]interface{}{
 				"code": 1, "msg": "无权限操作", "data": nil,
 			})
 		}
 		return next(c)
 	}
+}
+
+// IsAdmin 供各 controller 子包做比中间件更细的判断，
+// 例如 /api/get/user 的「管理员可查任何人，普通用户只能查自己」。
+func IsAdmin(user *models.User) bool {
+	return isLogin(user) && user.Role == roleAdmin
 }
 
 func isLogin(user *models.User) bool {

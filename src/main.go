@@ -151,6 +151,7 @@ func handleSignals(e *echo.Echo, graceful bool) {
 
 	if !graceful {
 		logger.Info("Shutdown quickly, bye...", sig)
+		db.Close()
 		logger.Close()
 		os.Exit(0)
 	}
@@ -161,6 +162,8 @@ func handleSignals(e *echo.Echo, graceful bool) {
 	if err := e.Shutdown(ctx); err != nil {
 		logger.Error("优雅关闭失败:", err)
 	}
+	// 在途请求处理完再关池，否则会打断正在执行的查询
+	db.Close()
 	logger.Close()
 	os.Exit(0)
 }

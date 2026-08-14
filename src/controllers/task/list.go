@@ -7,8 +7,25 @@ import (
 	"github.com/lnatpunblhna/gopub/src/library/db"
 )
 
+// List 返回全部上线单，只给管理员用（前端「全部上线单」页）。
 func List(c echo.Context) error {
+	return listTasks(controllers.New(c), 0)
+}
+
+// MyList 只返回当前登录用户自己创建的上线单。
+//
+// 用户 ID 一律取自登录态。原先前端把自己的 user.Id 当 my 参数传上来、后端照单
+// 全收（listTasks 的 myUserId），把参数改成别人的 ID 就能看别人的上线单。
+func MyList(c echo.Context) error {
 	ctx := controllers.New(c)
+	if ctx.User == nil || ctx.User.Id == 0 {
+		return ctx.SetJson(2, nil, "not login")
+	}
+	return listTasks(ctx, ctx.User.Id)
+}
+
+// listTasks 是两个列表接口共用的查询。userId 非 0 时只返回该用户创建的上线单。
+func listTasks(ctx *controllers.Ctx, userId int) error {
 	page, _ := ctx.GetInt("page", 0)
 	start := 0
 	length, _ := ctx.GetInt("length", 15)
@@ -24,10 +41,9 @@ func List(c echo.Context) error {
 		like := "%" + selectInfo + "%"
 		args = append(args, like, like, like)
 	}
-	myUserId, _ := ctx.GetInt("my", 0)
-	if myUserId != 0 {
+	if userId != 0 {
 		where += "  and task.user_id= ? "
-		args = append(args, myUserId)
+		args = append(args, userId)
 	}
 
 	listArgs := append(append([]interface{}{}, args...), start, length)

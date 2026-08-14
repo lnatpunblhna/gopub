@@ -11,23 +11,51 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
-// 允许未登录访问的路由：登录入口、前端入口页，以及免登录看日志页用到的只读查询。
+// 允许未登录访问的路由：只有登录入口与前端入口页。
 // 其余内部路由都必须被 RequireLogin / RequireAdmin 拦住。
+//
+// 这里以前还有一份免登录只读白名单（task/list、task/get、conf/get、
+// record/list、record/attempts），支撑 searchtaskList / searchtaskRelease
+// 两个匿名查询页。那两个页面已连同白名单一起删掉，新增接口不要再往这里加。
 var noAuthRoutes = map[string]bool{
-	"POST /login":                  true,
-	"GET /loginbydocke":            true,
-	"GET /":                        true,
-	"GET /api/get/task/list":       true,
-	"GET /api/get/task/get":        true,
-	"GET /api/get/conf/get":        true,
-	"GET /api/get/record/list":     true,
-	"GET /api/get/record/attempts": true,
-	"GET /v1/token":                true, // 签发 token 的接口本身不能要求带 token
+	"POST /login":       true,
+	"GET /loginbydocke": true,
+	"GET /":             true,
+	"GET /v1/token":     true, // 签发 token 的接口本身不能要求带 token
+}
+
+// wantAdminRoutes 是必须挂 RequireAdmin 的路由，与前端菜单里标了 adminOnly
+// 的页面一一对应。判断依据是「接口的全部调用方都是 admin 页面」，
+// 被普通用户页面用到的接口（conf/get、conf/mylist、task/mylist 等）不在此列。
+var wantAdminRoutes = []string{
+	"GET /api/get/conf/copy",
+	"GET /api/get/conf/del",
+	"GET /api/get/conf/list",
+	"GET /api/get/conf/server_groups",
+	"GET /api/get/conf/tags",
+	"GET /api/get/git/gitlog",
+	"GET /api/get/git/gitpull",
+	"GET /api/get/other/noauto",
+	"GET /api/get/p2p/check",
+	"GET /api/get/p2p/send",
+	"GET /api/get/p2p/task",
+	"GET /api/get/task/list",
+	"GET /api/get/user/del",
+	"GET /api/get/user/project",
+	"GET /api/get/walle/detection",
+	"GET /api/get/walle/detectionssh",
+	"GET /api/get/walle/flush",
+	"GET /api/post/p2p/agent",
+	"POST /api/get/conf/get",
+	"POST /api/post/conf/save",
+	"POST /api/post/p2p/agent",
+	"POST /register",
 }
 
 // wantRoutes 是预期的全部路由，用于确认改动没有意外增删接口。
 // 新增一条时要同步加到这里：
 //   - GET /api/get/record/log：下载单条记录的完整输出（入库的 memo 是截断过的）
+//   - GET /api/get/task/mylist：我的上线单，按登录态过滤，取代原先由前端传 my 参数的用法
 var wantRoutes = []string{
 	"GET /",
 	"GET /api/get/conf/copy",
@@ -59,6 +87,7 @@ var wantRoutes = []string{
 	"GET /api/get/task/get",
 	"GET /api/get/task/last",
 	"GET /api/get/task/list",
+	"GET /api/get/task/mylist",
 	"GET /api/get/task/rollback",
 	"GET /api/get/test/api",
 	"GET /api/get/user",
@@ -115,6 +144,25 @@ func TestRegisterRoutesUnchanged(t *testing.T) {
 
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("路由表与预期不一致\n实际:\n%s\n预期:\n%s",
+			strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// TestAdminRoutesUnchanged 确认挂了 RequireAdmin 的路由与预期一致。
+//
+// 光靠 TestInternalRoutesRequireLogin 只能验出「未登录被拦住」，
+// 把某个管理员接口误降级成 RequireLogin 它是发现不了的——普通用户照样能调。
+// 这里直接比对 Register 注册时记录下来的 admin 清单。
+func TestAdminRoutesUnchanged(t *testing.T) {
+	newTestEcho() // 触发 Register，填充 adminRoutePaths
+
+	got := append([]string(nil), adminRoutePaths...)
+	sort.Strings(got)
+	want := append([]string(nil), wantAdminRoutes...)
+	sort.Strings(want)
+
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("管理员路由与预期不一致\n实际:\n%s\n预期:\n%s",
 			strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }

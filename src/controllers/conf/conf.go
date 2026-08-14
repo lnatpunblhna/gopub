@@ -16,8 +16,7 @@ func Conf(c echo.Context) error {
 	if ctx.Project != nil && ctx.Project.Id != 0 {
 		return ctx.SetJson(0, ctx.Project, "")
 	}
-	// 这个接口在免登录白名单里（免登录看日志页要拿项目名和环境）。
-	// 未登录、以及登录了但对该项目没有权限的用户，都只拿到页面展示用的字段，
+	// 登录了但对该项目没有权限的用户只拿到页面展示用的字段，
 	// 仓库口令、服务器列表、部署命令等一概不返回
 	projectId, _ := ctx.GetInt("projectId", 0)
 	project, _ := models.GetProjectById(projectId)
