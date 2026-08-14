@@ -1,0 +1,4 @@
+# 运维配置：含真实凭据，不进构建上下文。
+# 镜像里只放 src/conf/app.conf.example，由入口 ./control rundocker 的 ensure_conf
+# 在容器内生成 app.conf；挂卷覆盖 src/conf 的部署，每次起容器也会自动补出来。
+src/conf/app.conf

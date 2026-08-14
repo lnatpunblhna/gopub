@@ -1,3 +1,6 @@
+#配置模板。首次部署时由 control 复制为同目录的 app.conf（见 control 的 ensure_conf），
+#之后升级不会再覆盖 app.conf——发布包与镜像里都只带这份 .example，不带 app.conf。
+#本文件入 git，请勿在此填写真实凭据；真实凭据只写进 app.conf（已被 .gitignore 忽略）。
 appname = gopub
 httpport = 8080
 runmode = prod
@@ -71,17 +74,23 @@ AccessLogs= true
 
 #数据库配置
 mysqluser = "root"
-mysqlpass = "gydz88888888"
-mysqlhost = "192.168.0.101"
+mysqlpass = ""
+mysqlhost = "127.0.0.1"
 mysqlport = 3306
 mysqldb   = "go_pub"
+#连接池：常驻的空闲连接数与最大连接数
 db_max_idle_conn = 30
 db_max_open_conn = 100
+#单条连接最长存活秒数，须小于 MySQL 的 wait_timeout(默认 28800)与中间层空闲超时
+db_conn_max_lifetime = 3600
+#空闲连接最长保留秒数，超时后归还给操作系统，闲时收缩连接池
+db_conn_max_idle_time = 600
 
 #p2p配置
 AgentDir="agent/"
 AgentDestDir="/data/Taipei-Torrent/"
-SecretKey = "1234"
+#务必换成足够随机的长字符串，不要沿用模板里的占位值
+SecretKey = ""
 
 #jenkins配置
 JenkinsUserName=""
@@ -105,17 +114,23 @@ AccessLogs= false
 
 #数据库配置
 mysqluser = "root"
-mysqlpass = "gydz88888888"
-mysqlhost = "192.168.0.101"
+mysqlpass = ""
+mysqlhost = "127.0.0.1"
 mysqlport = 3306
 mysqldb   = "go_pub"
+#连接池：常驻的空闲连接数与最大连接数
 db_max_idle_conn = 30
 db_max_open_conn = 100
+#单条连接最长存活秒数，须小于 MySQL 的 wait_timeout(默认 28800)与中间层空闲超时
+db_conn_max_lifetime = 3600
+#空闲连接最长保留秒数，超时后归还给操作系统，闲时收缩连接池
+db_conn_max_idle_time = 600
 
 #p2p配置
 AgentDir="agent/"
 AgentDestDir="/data/Taipei-Torrent/"
-SecretKey = "1234"
+#务必换成足够随机的长字符串，不要沿用模板里的占位值
+SecretKey = ""
 
 #jenkins配置
 JenkinsUserName=""
@@ -139,18 +154,26 @@ AdminPort = 8090
 AccessLogs= false
 
 #数据库配置
+#容器部署下这几项会被 MYSQL_USER / MYSQL_PASS / MYSQL_HOST / MYSQL_PORT / MYSQL_DB
+#环境变量覆盖(仅 runmode=docker 生效，见 src/main.go)，这里保留可直接跑通的默认值
 mysqluser = "root"
 mysqlpass = "123456"
 mysqlhost = "mysql"
 mysqlport = 3306
 mysqldb   = "walle"
+#连接池：常驻的空闲连接数与最大连接数
 db_max_idle_conn = 30
 db_max_open_conn = 100
+#单条连接最长存活秒数，须小于 MySQL 的 wait_timeout(默认 28800)与中间层空闲超时
+db_conn_max_lifetime = 3600
+#空闲连接最长保留秒数，超时后归还给操作系统，闲时收缩连接池
+db_conn_max_idle_time = 600
 
 #p2p配置
 AgentDir="agent/"
 AgentDestDir="/data/Taipei-Torrent/"
-SecretKey = "1234"
+#务必换成足够随机的长字符串，不要沿用模板里的占位值
+SecretKey = ""
 
 #jenkins配置
 JenkinsUserName=""

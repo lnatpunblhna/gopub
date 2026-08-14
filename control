@@ -7,6 +7,7 @@ export GO111MODULE=on
 
 app=$BASENAME
 conf=$DIR/src/conf/app.conf
+conf_example=$DIR/src/conf/app.conf.example
 pidfile=$DIR/$BASENAME.pid
 logfile=$DIR/src/logs/stdout.log
 
@@ -19,6 +20,21 @@ logfile=$DIR/src/logs/stdout.log
         fi
     fi
     return 0
+}
+
+# 只在 app.conf 缺失时从模板生成一次。
+# 发布包与镜像里都只带 app.conf.example(见 pack 的 --exclude 与 release.yml),
+# 所以升级解压不会覆盖线上已填好的 app.conf;这里负责首次部署时把模板落成可用文件。
+function ensure_conf() {
+    if [ -f "$conf" ]; then
+        return 0
+    fi
+    if [ ! -f "$conf_example" ]; then
+        echo "缺少配置文件 $conf,且模板 $conf_example 也不存在"
+        exit 1
+    fi
+    cp "$conf_example" "$conf"
+    echo "已从模板生成 $conf —— 首次部署请先填写数据库连接与 SecretKey 再启动"
 }
 
 function build() {
@@ -57,7 +73,9 @@ function pack() {
     buildall
     cd  ..
     rm  -rf $BASENAME/src/logs/*
-    cd  .. && tar zcvf $app.tar.gz $BASENAME/control $BASENAME/$app.service $BASENAME/src/$app  $BASENAME/src/conf    $BASENAME/src/logs   $BASENAME/src/agent  $BASENAME/src/views $BASENAME/src/static  $BASENAME/src/favicon.ico
+    # --exclude 排除 app.conf:它不入 git,但开发机工作区里有一份,不排除就会被打进包,
+    # 解压到目标机时覆盖掉线上配置。包里只留 app.conf.example,由 ensure_conf 首次生成
+    cd  .. && tar --exclude=$BASENAME/src/conf/app.conf -zcvf $app.tar.gz $BASENAME/control $BASENAME/$app.service $BASENAME/src/$app  $BASENAME/src/conf    $BASENAME/src/logs   $BASENAME/src/agent  $BASENAME/src/views $BASENAME/src/static  $BASENAME/src/favicon.ico
 }
 function start() {
     check_pid
@@ -68,9 +86,7 @@ function start() {
         return 1
     fi
 
-    if ! [ -f $conf ];then
-        echo "Config file $conf doesn't exist, creating one." 
-    fi
+    ensure_conf
     cd $DIR/src/
     mkdir -p $DIR/src/logs
     nohup  ./$BASENAME  >$logfile 2>&1 &
@@ -122,16 +138,19 @@ function status() {
     fi
 }
 function run() {
+   ensure_conf
    cd $DIR/src/
    ./$BASENAME -docker
-   #go run main.go 
+   #go run main.go
 }
 function rundocker() {
+   ensure_conf
    cd $DIR/src/
    ./$BASENAME -docker
    #go run main.go
 }
 function init() {
+   ensure_conf
    cd $DIR/src/
    ./$BASENAME -syncdb
    #go run main.go

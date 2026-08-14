@@ -176,7 +176,7 @@ Good fits:
 │   ├── models/                   # GORM models, AutoMigrate, seed data
 │   ├── routers/router.go         # all route registration (incl. CORS)
 │   ├── tasks/                    # background jobs (P2P agent health check)
-│   ├── conf/app.conf             # main configuration file
+│   ├── conf/app.conf.example     # config template (tracked); app.conf is generated and untracked
 │   ├── agent/                    # P2P agent binary, server.json / agent.json
 │   ├── static/  views/index.tpl  # Vite output and entry template (build artefacts, not in git)
 │   └── logs/                     # runtime and task logs
@@ -251,7 +251,13 @@ ssh-copy-id -i ~/.ssh/id_rsa.pub deploy@TARGET_HOST
 
 ### 2. Configure the database
 
-Edit `src/conf/app.conf` and fill in the section matching your run mode (`[dev]` / `[prod]` / `[docker]`):
+The repository only ships the template `src/conf/app.conf.example`; the file actually read at runtime, `src/conf/app.conf`, is untracked (see `.gitignore`). Copy it from the template — `./control start|run|rundocker|init` also does this automatically when it is missing:
+
+```shell
+cp src/conf/app.conf.example src/conf/app.conf
+```
+
+Then edit `src/conf/app.conf` and fill in the section matching your run mode (`[dev]` / `[prod]` / `[docker]`):
 
 ```ini
 runmode = prod          # selects which section wins
@@ -266,7 +272,7 @@ mysqldb   = "go_pub"
 SecretKey = "replace-with-a-long-random-string"
 ```
 
-> Configuration is only loaded from `conf/app.conf` relative to the working directory, or next to the executable (`src/library/config/config.go:43`). There is no `app.local.conf` override mechanism — edit `src/conf/app.conf` directly, and take care not to commit real credentials.
+> Configuration is only loaded from `conf/app.conf` relative to the working directory, or next to the executable (`src/library/config/config.go:43`). There is no `app.local.conf` override mechanism — edit `src/conf/app.conf` directly. The file is out of version control, so neither `git pull` nor unpacking a release will overwrite it, and it cannot be committed by accident. When you add a new config key, mirror it into `app.conf.example` — otherwise fresh deployments won't get it.
 
 ### 3. Build the frontend
 
@@ -302,6 +308,8 @@ Open `http://127.0.0.1:8192`. The seeded admin username is `admin`; its initial 
 
 `control` subcommands: `build | webbuild | buildall | pack | start | stop | kill | restart | reload | status | run | rundocker | init | tail | docs | beerun | sslkey`.
 
+> **Upgrades never overwrite your config.** The release archive (`control pack` and the Release asset) contains `src/conf/app.conf.example` but **not `app.conf`**, so unpacking over an existing install only replaces the binary and the frontend assets — your database password, `SecretKey`, and everything else stay as they are. On a fresh install `./control start` generates `app.conf` from the template.
+
 > `webbuild` is deliberately kept out of `build`: the golang stage in `Dockerfile` runs `./control build` in an image that has no Node.js, so folding the frontend build into `build` would break the image. `pack` calls `buildall`, since `src/static` is no longer in git and would otherwise be packaged empty.
 
 ## Configuration
@@ -320,7 +328,7 @@ The file is ini-formatted. Keys are case-insensitive (lower-cased internally), a
 | `AccessLogs` | per section | access logging |
 | `Graceful` | `false` | when `true`, drain in-flight requests on shutdown (10s timeout) |
 | `SshPort` | `22` | SSH port used for target hosts |
-| `SecretKey` | `1234` | **JWT signing key — must be changed** |
+| `SecretKey` | empty | **JWT signing key — must be set to a long random string** |
 | `SessionOn` / `SessionGCMaxLifetime` / `SessionCookieLifeTime` | `true` / `86400` / `86400` | beego leftovers; no code reads them after the Echo migration, so changing them has no effect |
 | `AutoRender` / `CopyRequestBody` / `EnableDocs` / `EnableHTTP` / `HttpsPort` / `EnableAdmin` / `AdminAddr` / `AdminPort` | — | also beego leftovers; re-readable request bodies are now unconditional in `src/controllers/base.go` |
 
@@ -329,7 +337,11 @@ The file is ini-formatted. Keys are case-insensitive (lower-cased internally), a
 | Key | Notes |
 | --- | --- |
 | `mysqluser` / `mysqlpass` / `mysqlhost` / `mysqlport` / `mysqldb` | connection parameters |
-| `db_max_idle_conn` / `db_max_open_conn` | pool sizes (defaults 30 / 100) |
+| `db_max_idle_conn` / `db_max_open_conn` | idle and maximum pool sizes (defaults 30 / 100) |
+| `db_conn_max_lifetime` | max lifetime of a single connection in seconds (default 3600); keep it below MySQL's `wait_timeout` |
+| `db_conn_max_idle_time` | max idle time before a pooled connection is released, in seconds (default 600) |
+
+Connections are long-lived and reused: a single global pool is created at startup (`Init` in `src/library/db/db.go`); queries borrow from the pool and return to it, so there is no TCP + auth handshake per request. Up to `db_max_idle_conn` connections stay resident and are only reclaimed after `db_conn_max_idle_time` of inactivity; any connection older than `db_conn_max_lifetime` is retired and rebuilt so the pool never hands out a connection that MySQL or a proxy has already closed. `db.Stats()` exposes live pool metrics (in-use / idle / wait count) for diagnosing pool exhaustion.
 
 When `runmode=docker`, the env vars `MYSQL_USER` / `MYSQL_PASS` / `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_DB` take precedence over the file (`src/library/db/db.go:91`). **They have no effect outside docker mode.**
 
@@ -381,7 +393,7 @@ About the image:
 - The build runs `ssh-keygen` to create `/root/.ssh/id_rsa` and prints the public key into the build log — **add that key to your targets' `authorized_keys`**.
 - Entrypoint is `./control rundocker`, i.e. started with `-docker`, which auto-creates the schema and enables the `MYSQL_*` env overrides.
 
-> For production, mount `/root/.ssh`, `src/conf`, and `src/logs` as volumes — otherwise recreating the container loses the key, the config, and the logs.
+> For production, mount `/root/.ssh`, `src/conf`, and `src/logs` as volumes — otherwise recreating the container loses the key, the config, and the logs. The image only ships `src/conf/app.conf.example`; the entrypoint `./control rundocker` generates `app.conf` from it when missing, so an empty volume still boots on first start (database settings come from the `MYSQL_*` env vars).
 
 ## Kubernetes
 
@@ -503,6 +515,17 @@ Credential lifecycle is centralised in `src/models/user_authkey.go`:
 
 Rows with a NULL `auth_key_expire_at` count as logged out, so everyone must sign in once after upgrading to this version — that is precisely how the older, non-expiring credentials get revoked.
 
+#### Page-level permissions (admin gate)
+
+The pages marked `adminOnly` in the frontend menu — project config, all deploy tickets, ops tools, user management — are open to `role=1` only. The gate is enforced on both sides:
+
+- Frontend: `meta.admin` on the route plus the `beforeEach` guard in `frontend/src/router/index.js`. Filtering the menu alone does not stop someone from typing the URL directly.
+- Backend: registered through `adminGET` / `adminPOST` in `src/routers/router.go`, backed by `RequireAdmin` in `src/controllers/auth.go`. An endpoint is gated when *all* of its callers are admin pages; endpoints used by ordinary-user pages (`conf/get`, `conf/mylist`, `task/mylist`, …) still only require login.
+
+`wantAdminRoutes` in `src/routers/router_test.go` pins that inventory, and `src/controllers/auth_test.go` covers the middleware's allow/deny behaviour per role directly. Adding an admin endpoint means updating both.
+
+> **Unauthenticated access was removed in this version.** Five endpoints — `/api/get/task/list`, `/api/get/task/get`, `/api/get/conf/get`, `/api/get/record/list`, `/api/get/record/attempts` — used to sit in a no-auth allowlist backing the anonymous `searchtaskList` / `searchtaskRelease` pages. Those pages duplicated `taskList` / `taskRelease` and doubled as a way around the admin gate above, so they were deleted along with the allowlist and the "query tickets" entry on the login page. Everything except `/login`, `/loginbydocke`, `/`, and `/v1/token` now requires login.
+
 #### Object-level permissions
 
 Beyond being logged in, there is a second layer: whether a user may read or write a given project / ticket is decided in one place, `src/controllers/perm.go`, with the same semantics as the project list filter (`src/controllers/conf/mylist.go:30-35`) — **if you can see it in the list, you can act on it**:
@@ -532,9 +555,9 @@ Pushing a large artifact to many hosts over SFTP saturates the deploy host's upl
 
 ⚠️ This system holds SSH keys for your fleet and can run arbitrary commands on it — treat it like a bastion host.
 
-- **Change `SecretKey`.** It signs the JWTs, and the committed default is `1234`.
+- **Change `SecretKey`.** It signs the JWTs. The template leaves it empty — set a sufficiently random long string after generating your config.
 - **Change the default admin password.** `admin`'s seeded hash is a publicly known upstream value.
-- **Don't commit real credentials.** `src/conf/app.conf` still carries sample/legacy values (database password, internal IPs, mailbox). Override them at deploy time, and consider removing the file from version control or injecting config via environment.
+- **Don't commit real credentials.** `src/conf/app.conf` is now out of version control (`.gitignore`); the repository only keeps `app.conf.example` with placeholder values. Note that **the database password committed earlier is still visible in git history** — rotate it if that credential is still in use.
 - **Fields like `repo_password` are stored in plaintext** in MySQL — restrict database access accordingly.
 - **Hooks and deploy commands execute on targets as `release_user`**, so anyone with project permission effectively has command execution there. There is **no working approval step** (see [Known Limitations](#known-limitations)), so the project grants in the `group` table are the only gate — grant sparingly.
 - **CORS is currently `AllowOrigins: ["*"]`** (`src/routers/router.go:27`) — tighten it before exposing the service.
@@ -543,18 +566,17 @@ Pushing a large artifact to many hosts over SFTP saturates the deploy host's upl
 
 ## Known Limitations
 
-- Test coverage is still lowish: the repository has four test files — `src/library/ssh/remote_test.go` (SSH algorithm tiers), `src/routers/router_test.go` (route inventory and auth enforcement), `src/library/common/shell_test.go` (shell quoting and git ref validation), and `src/controllers/perm_test.go` (the object-level permission matrix); every other package reports `no test files`, and there are no frontend tests.
+- Test coverage is still lowish: only a handful of test files — `src/library/ssh/remote_test.go` (SSH algorithm tiers), `src/routers/router_test.go` (route inventory, no-auth enforcement, admin route inventory), `src/controllers/auth_test.go` (`RequireLogin` / `RequireAdmin` allow/deny per role), `src/library/common/shell_test.go` (shell quoting and git ref validation), and `src/controllers/perm_test.go` (the object-level permission matrix); most other packages report `no test files`, and there are no frontend tests.
 - Four project fields are inert: `post_release_together` ("run once after every host finishes"), `gzip`, `audit`, and `view_history`. They exist on `models.Project` and have defaults in the frontend form, but nothing on the backend reads them, so setting them changes no behaviour. Use `last_deploy` for wrap-up commands, and `/api/get/task/changes` for diffs (it does not consult `view_history`). (`EnableGzip` in `app.conf` is unrelated — that's HTTP response compression and works.)
 - **There is no approval step.** The `status=2` ("audit rejected") state exists, but no code ever sets a ticket to 2 and there is no approval endpoint — anyone with project permission can deploy directly.
-- What the unauthenticated allowlist exposes is not permission-filtered: anyone can pass a `taskId` / `projectId` to those four public read-only endpoints and get back the **display fields** of a ticket or project (title, status, branch, project name, environment) plus the **full release record** (every command and its output, from the `record` table). Sensitive fields are redacted — projects are reduced to the `publicProject` allowlist (no repo password, host list, or deploy commands) and tickets have `hosts` stripped — but the command output itself remains public.
-- Four internal endpoints are **deliberately unauthenticated**: `/api/get/task/list`, `/api/get/task/get`, `/api/get/conf/get`, and `/api/get/record/list`. They back the login-free log viewer (`searchtaskList` / `searchtaskRelease`); the allowlist is spelled out at `src/routers/router.go:44-47` and registered in `noAuthRoutes` in `src/routers/router_test.go`. This means **deploy ticket lists, project config, and release records are readable without credentials** — restrict them at a reverse proxy before exposing the service. (Every other internal route is gated by `RequireLogin` at `src/controllers/auth.go:42`; account creation/deletion and the user list additionally require `RequireAdmin` — see `src/routers/router.go:54` and `:107`.)
+- A little lateral visibility remains between logged-in users: `/api/get/record/attempts` looks up by `taskId` alone and does not check whether the caller has permission on the owning project. It only returns attempt numbers, timestamps, and success/failure — no commands or host details — but strictly speaking it is still readable across projects.
 - Element Plus is registered wholesale via `app.use(ElementPlus)`. It builds into its own `element-plus` chunk (~970 kB, 311 kB gzipped) and is a first-paint dependency. Switching to on-demand imports would shrink it considerably, but that also means taking over the 54 call sites using globals like `this.$message` / `this.$confirm`.
 - The JumpServer integration targets the 1.5.3 API; newer JumpServer releases need adapting.
 
 ## FAQ
 
 **Q: Startup fails with "cannot find conf/app.conf".**
-Configuration is resolved relative to the **working directory**. Start via `./control start` (which `cd`s into `src/`), or `cd src/` before running the binary.
+Two possibilities. Either the config hasn't been created from the template yet — `cp src/conf/app.conf.example src/conf/app.conf` (`./control start` does this for you) — or the working directory is wrong: configuration is resolved relative to the **working directory**, so start via `./control start` (which `cd`s into `src/`), or `cd src/` before running the binary.
 
 **Q: Is the port 8080 or 8192?**
 The global section says `httpport = 8080`, but `[dev]`, `[prod]`, and `[docker]` all set `HttpPort = 8192`, and section values win — so it's **8192**.

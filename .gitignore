@@ -329,5 +329,9 @@ OpenCover/
 /gopub.pid
 /src/agent/*.pid
 
+# 运维配置：含真实凭据，由 control 的 ensure_conf 从 src/conf/app.conf.example 生成。
+# 不入库也不进发布包与镜像，升级解压才不会覆盖线上已填好的配置
+/src/conf/app.conf
+
 # macOS
 .DS_Store

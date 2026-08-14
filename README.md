@@ -176,7 +176,7 @@ gopub 是一个自托管的 Web 发布系统，把「代码从仓库到目标服
 │   ├── models/                   # GORM 模型 + AutoMigrate + 初始化数据
 │   ├── routers/router.go         # 全部路由注册（含 CORS）
 │   ├── tasks/                    # 后台任务（P2P agent 健康检查）
-│   ├── conf/app.conf             # 主配置文件
+│   ├── conf/app.conf.example     # 配置模板（入库）；app.conf 由 control 生成且不入库
 │   ├── agent/                    # P2P agent 二进制与 server.json / agent.json
 │   ├── static/  views/index.tpl  # Vite 构建产物与入口模板
 │   └── logs/                     # 运行日志、任务日志
@@ -251,7 +251,13 @@ ssh-copy-id -i ~/.ssh/id_rsa.pub deploy@目标机IP
 
 ### 2. 配置数据库
 
-编辑 `src/conf/app.conf`，按运行模式（`[dev]` / `[prod]` / `[docker]`）填写数据库连接：
+仓库里只有模板 `src/conf/app.conf.example`，实际使用的 `src/conf/app.conf` 不入库（见 `.gitignore`），需要从模板复制一份——`./control start|run|rundocker|init` 检测到它缺失时也会自动复制：
+
+```shell
+cp src/conf/app.conf.example src/conf/app.conf
+```
+
+然后编辑 `src/conf/app.conf`，按运行模式（`[dev]` / `[prod]` / `[docker]`）填写数据库连接：
 
 ```ini
 runmode = prod          # 决定读取哪个段的配置
@@ -266,7 +272,7 @@ mysqldb   = "go_pub"
 SecretKey = "换成足够随机的长字符串"
 ```
 
-> 配置文件只会从**运行目录下的 `conf/app.conf`** 或可执行文件同级的 `conf/app.conf` 加载（`src/library/config/config.go:43`），没有 `app.local.conf` 之类的覆盖机制。本地改配置请直接改 `src/conf/app.conf`，注意别把真实密码提交上去。
+> 配置文件只会从**运行目录下的 `conf/app.conf`** 或可执行文件同级的 `conf/app.conf` 加载（`src/library/config/config.go:43`），没有 `app.local.conf` 之类的覆盖机制。改配置请直接改 `src/conf/app.conf`；该文件已从版本控制中移出，不会被 `git pull` 或升级解压覆盖，也不会被误提交。新增配置项时记得同步补进 `app.conf.example`，否则新部署拿不到它。
 
 ### 3. 构建前端
 
@@ -302,6 +308,8 @@ cd frontend && npm run dev
 
 `control` 脚本可用子命令：`build | pack | start | stop | kill | restart | reload | status | run | rundocker | init | tail | sslkey`。
 
+> **升级不会覆盖配置**：发布包（`control pack` 与 Release 附件）里只有 `src/conf/app.conf.example`，**不含 `app.conf`**，所以解压到现有目录只会换掉二进制与前端静态资源，你填好的数据库密码、`SecretKey` 等原样保留。首次部署时 `./control start` 会自动从模板生成一份。若你从更早的版本升级，目标机上那份 `app.conf` 本来就在，不需要任何额外操作。
+
 > **从旧版本升级**：`user` 表新增了 `auth_key_expire_at` 列（登录凭据过期时刻）。`./control init` 会建它，但通常升级时只换二进制、不重跑 init，所以启动时也会检查一次并自动补列（`src/models/user_authkey.go` 的 `MigrateAuthKeyColumn`）。若数据库账号没有 DDL 权限，补列会失败并在日志里明确提示——**这种情况下登录不可用**，需要手动执行 `./control init` 或补一句 `ALTER TABLE user ADD COLUMN auth_key_expire_at datetime NULL;`。升级后所有人需重新登录一次，详见[内部接口](#3-内部接口)。
 
 ## 配置说明
@@ -320,7 +328,7 @@ cd frontend && npm run dev
 | `AccessLogs` | 按段 | 是否打印访问日志 |
 | `Graceful` | `false` | 为 `true` 时收到退出信号会等待在途请求（10s 超时） |
 | `SshPort` | `22` | 连接目标机的 SSH 端口 |
-| `SecretKey` | `1234` | **JWT 签名密钥，必须修改** |
+| `SecretKey` | 空 | **JWT 签名密钥，必须填写足够随机的长字符串** |
 | `authKeyLifetime` | `604800` | 控制台登录凭据有效期（秒），滑动过期。配成非正数时回落到默认的 7 天 |
 | `SessionOn` / `SessionGCMaxLifetime` / `SessionCookieLifeTime` | `true` / `86400` / `86400` | beego 遗留项，迁移到 Echo 后已无代码读取，改动无效果 |
 | `AutoRender` / `CopyRequestBody` / `EnableDocs` / `EnableHTTP` / `HttpsPort` / `EnableAdmin` / `AdminAddr` / `AdminPort` | — | 同为 beego 遗留项；请求体重复读取现已由 `src/controllers/base.go` 无条件支持 |
@@ -330,7 +338,11 @@ cd frontend && npm run dev
 | 键 | 说明 |
 | --- | --- |
 | `mysqluser` / `mysqlpass` / `mysqlhost` / `mysqlport` / `mysqldb` | 连接参数 |
-| `db_max_idle_conn` / `db_max_open_conn` | 连接池（默认 30 / 100） |
+| `db_max_idle_conn` / `db_max_open_conn` | 连接池的常驻空闲连接数与最大连接数（默认 30 / 100） |
+| `db_conn_max_lifetime` | 单条连接最长存活秒数（默认 3600），须小于 MySQL 的 `wait_timeout` 与中间层空闲超时 |
+| `db_conn_max_idle_time` | 空闲连接最长保留秒数（默认 600），闲时据此收缩连接池 |
+
+连接全程复用：进程启动时建立一个全局连接池（`src/library/db/db.go` 的 `Init`），查询从池中借出、用完归还，不存在一次请求一次 TCP + 认证握手。空闲连接常驻 `db_max_idle_conn` 条，超过 `db_conn_max_idle_time` 未使用才回收；任一连接活过 `db_conn_max_lifetime` 会被主动淘汰重建，避免用到被 MySQL 或中间层单方面关闭的死连接。`db.Stats()` 可读取池的实时状态（在用/空闲/等待次数）用于排查连接不足。
 
 `runmode=docker` 时，环境变量 `MYSQL_USER` / `MYSQL_PASS` / `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_DB` 优先于配置文件（`src/library/db/db.go:91`）。**注意：非 docker 模式下这些环境变量不生效。**
 
@@ -382,7 +394,7 @@ docker run --name gopub \
 - 构建时会执行 `ssh-keygen` 生成 `/root/.ssh/id_rsa` 并把公钥打印到构建日志，**需要把这段公钥加入目标机的 `authorized_keys`**；
 - 入口是 `./control rundocker`，即以 `-docker` 参数启动，会自动建库建表并让 `MYSQL_*` 环境变量生效。
 
-> 生产环境建议把 `/root/.ssh` 与 `src/conf`、`src/logs` 挂载为卷，否则重建容器会丢失密钥、配置与日志。
+> 生产环境建议把 `/root/.ssh` 与 `src/conf`、`src/logs` 挂载为卷，否则重建容器会丢失密钥、配置与日志。镜像里只打包 `src/conf/app.conf.example`，入口 `./control rundocker` 会在 `app.conf` 缺失时从模板生成，所以挂空卷首次启动也能跑起来（数据库连接由 `MYSQL_*` 环境变量注入）。
 
 ## Kubernetes 部署
 
@@ -504,6 +516,17 @@ Web 控制台使用的是 `/api/get/*` 与 `/api/post/*` 系列（项目配置�
 
 `auth_key_expire_at` 为 NULL 的记录一律视为未登录，所以升级到本版本后所有人都需要重新登录一次——这正是为了吊销升级前签发的那批无过期时间的凭据。
 
+#### 页面级权限（管理员门禁）
+
+前端菜单里标了 `adminOnly` 的那些页面——项目配置、全部上线单、运维工具、用户管理——只对 `role=1` 开放。这道门禁在前后端各挂一次：
+
+- 前端：路由 `meta.admin` + `frontend/src/router/index.js` 的 `beforeEach` 守卫。光靠菜单过滤挡不住直接在地址栏敲 URL。
+- 后端：`src/routers/router.go` 里用 `adminGET` / `adminPOST` 注册，中间件是 `src/controllers/auth.go` 的 `RequireAdmin`。判断依据是「该接口的全部调用方都是 admin 页面」，被普通用户页面用到的接口（`conf/get`、`conf/mylist`、`task/mylist` 等）仍只要求登录。
+
+`src/routers/router_test.go` 的 `wantAdminRoutes` 锁定了这份清单，`src/controllers/auth_test.go` 直接覆盖中间件本身对各角色的放行 / 拒绝。新增管理员接口时两处都要同步。
+
+> **本版本移除了免登录访问**。此前 `/api/get/task/list`、`/api/get/task/get`、`/api/get/conf/get`、`/api/get/record/list`、`/api/get/record/attempts` 五个接口在免登录白名单里，支撑 `searchtaskList` / `searchtaskRelease` 两个匿名查询页。那两个页面与 `taskList` / `taskRelease` 功能重合，同时也是绕过上面 admin 门禁的口子，已连同白名单、登录页的「上线单查询」入口一并删除。现在除 `/login`、`/loginbydocke`、`/`、`/v1/token` 外，所有接口都要求登录。
+
 #### 对象级权限
 
 登录之外还有一层**对象级权限**：能不能读写某个项目 / 上线单由 `src/controllers/perm.go` 统一判定，语义与项目列表的过滤规则（`src/controllers/conf/mylist.go:30-35`）保持一致——**列表里看得到的，才能操作**：
@@ -533,9 +556,9 @@ Web 控制台使用的是 `/api/get/*` 与 `/api/post/*` 系列（项目配置�
 
 ⚠️ 这套系统持有目标机的 SSH 密钥并能在上面执行任意命令，等同于一台跳板机，请按高敏感系统对待。
 
-- **必须修改 `SecretKey`**：它是 JWT 的签名密钥，仓库里的默认值是 `1234`。
+- **必须修改 `SecretKey`**：它是 JWT 的签名密钥，模板里留空，从模板生成配置后务必填一个足够随机的长字符串。
 - **必须修改默认管理员密码**：`admin` 的初始哈希是上游硬编码的公开值。（上游还预置了一个固定的 `auth_key`，等于把一个公开的 admin 凭据装进每套部署，现已改为留空、由首次登录签发。若你的库是早先建的，请确认 `user` 表里没有残留 `cJIrTa_b2Hnjn6BZkrL8PJkYto2Ael3O` 这个值。）
-- **不要提交真实凭据**：`src/conf/app.conf` 现在仍带着示例/历史值（数据库密码、内网 IP、邮箱），部署时请覆盖，并考虑把该文件从版本控制中移出或改用环境变量注入。
+- **不要提交真实凭据**：`src/conf/app.conf` 已从版本控制中移出（`.gitignore`），仓库里只留占位值的 `app.conf.example`。注意**历史提交里仍能查到早先写入的数据库密码**，如果那套凭据还在用，请另行更换。
 - **`repo_password` 等字段在数据库中是明文存储**，请限制数据库访问权限。
 - **钩子脚本与发布命令会在目标机上以 `release_user` 身份执行**，等于把命令执行权交给了有项目权限的用户。系统内**没有可用的审批环节**（见[已知限制](#已知限制)），所以 `group` 表里的项目授权就是唯一的闸门，务必克制。
 - **CORS 当前是 `AllowOrigins: ["*"]`**（`src/routers/router.go:27`），对外暴露前建议收紧到你自己的域名。
@@ -544,18 +567,17 @@ Web 控制台使用的是 `/api/get/*` 与 `/api/post/*` 系列（项目配置�
 
 ## 已知限制
 
-- 测试覆盖仍然偏低：全仓库有四个测试文件——`src/library/ssh/remote_test.go`（SSH 算法档位）、`src/routers/router_test.go`（路由清单与鉴权拦截）、`src/library/common/shell_test.go`（shell 转义与 git 引用名校验）、`src/controllers/perm_test.go`（对象级权限矩阵），其余包都是 `no test files`；前端没有测试。
+- 测试覆盖仍然偏低：只有少数几个测试文件——`src/library/ssh/remote_test.go`（SSH 算法档位）、`src/routers/router_test.go`（路由清单、免登录拦截与管理员路由清单）、`src/controllers/auth_test.go`（`RequireLogin` / `RequireAdmin` 对各角色的放行与拒绝）、`src/library/common/shell_test.go`（shell 转义与 git 引用名校验）、`src/controllers/perm_test.go`（对象级权限矩阵），其余包大多是 `no test files`；前端没有测试。
 - 有四个「配了也不生效」的项目字段：`post_release_together`（"所有服务器部署完成后统一执行"）、`gzip`、`audit`（审核开关）、`view_history`。它们在 `models.Project` 里有定义，前端表单里也有默认值，但后端没有任何地方读取，配置了不会产生行为差异。需要收尾命令请用 `last_deploy`；差异对比请用 `/api/get/task/changes`（它不看 `view_history`）。（注意 `app.conf` 里的 `EnableGzip` 是另一回事，那是 HTTP 响应压缩，正常生效。）
 - **没有发布审批环节**：`status=2`（审核拒绝）这个状态存在，但代码里没有任何地方会把上线单置为 2，也没有审批接口——有项目权限的人可以直接发布。
-- 免登录白名单接口读到的数据不区分权限：下面那四个公开只读接口，任何人都能按 `taskId` / `projectId` 拿到上线单与项目的**展示字段**（标题、状态、分支、项目名、环境等）以及**完整的发布记录**（`record` 表里逐条命令与输出）。敏感字段已经做了脱敏——项目侧只下发 `publicProject` 的白名单字段（不含仓库口令、服务器列表、部署命令），上线单侧抹掉了 `hosts`——但命令输出本身仍是公开的。
-- 有四个内部接口是**故意免登录**的：`/api/get/task/list`、`/api/get/task/get`、`/api/get/conf/get`、`/api/get/record/list`。它们是免登录看日志页（`searchtaskList` / `searchtaskRelease`）的数据来源，白名单在 `src/routers/router.go:44-47` 显式列出，也在 `src/routers/router_test.go` 的 `noAuthRoutes` 里登记。这意味着**上线单列表、项目配置、发布记录可以不带凭据读取**，对外暴露时请用反向代理另行限制。（其余内部路由已由 `src/controllers/auth.go:42` 的 `RequireLogin` 统一拦截，建号 / 删号 / 用户列表另需 `RequireAdmin`，见 `src/routers/router.go:54`、`:107`。）
+- 登录用户之间还有少量横向可见：`/api/get/record/attempts` 只按 `taskId` 查，不校验调用者对该上线单所属项目有没有权限。它只返回批次号、时间与成败，不含命令与主机信息，但严格说仍是越权可读。
 - Element Plus 是 `app.use(ElementPlus)` 全量注册，构建后单独成 `element-plus` chunk（约 970 kB / gzip 311 kB）且属首屏依赖。改为按需引入可显著瘦身，但需要同时接管代码里 54 处 `this.$message` / `this.$confirm` 这类全局属性。
 - JumpServer 对接按 1.5.3 版本 API 编写，新版 JumpServer 需要自行适配。
 
 ## 常见问题
 
 **Q：启动报「找不到配置文件 conf/app.conf」？**
-配置是相对**工作目录**查找的。请通过 `./control start`（内部会 `cd src/`）启动，或手动进入 `src/` 后再运行二进制。
+两种可能。一是还没从模板生成配置：`cp src/conf/app.conf.example src/conf/app.conf`（`./control start` 会自动做这一步）。二是工作目录不对——配置是相对**工作目录**查找的，请通过 `./control start`（内部会 `cd src/`）启动，或手动进入 `src/` 后再运行二进制。
 
 **Q：端口到底是 8080 还是 8192？**
 全局段写的是 `httpport = 8080`，但 `[dev]`/`[prod]`/`[docker]` 三个段都写了 `HttpPort = 8192`，而分段配置优先，所以实际是 **8192**。

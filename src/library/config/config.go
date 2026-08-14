@@ -51,7 +51,7 @@ func Load(path string) error {
 			}
 		}
 		if path == "" {
-			return errors.New("找不到配置文件 conf/app.conf")
+			return errors.New("找不到配置文件 conf/app.conf，请执行 ./control start（会自动从 conf/app.conf.example 生成），或手动复制模板：cp conf/app.conf.example conf/app.conf")
 		}
 	}
 

@@ -88,6 +88,11 @@ jobs:
           cp src/gopub "$STAGE/src/"
           cp src/favicon.ico "$STAGE/src/"
           cp -r src/conf src/agent src/views src/static "$STAGE/src/"
+          # 发布包只带配置模板,不带 app.conf——否则升级解压会覆盖目标机上已填好的
+          # 数据库密码等配置。app.conf 已不入 git(见 .gitignore),干净 checkout 下
+          # 本就不存在,这里的 rm 是兜底,断言则防止模板哪天被误删
+          rm -f "$STAGE/src/conf/app.conf"
+          test -f "$STAGE/src/conf/app.conf.example" || { echo "::error::发布包缺少配置模板 app.conf.example"; exit 1; }
           # agent_main 产物已移出版本管理,src/agent 里没有它,由上面的构建步骤提供
           cp agent_main "$STAGE/src/agent/agent_main"
           rm -f "$STAGE"/src/agent/*.go
